@@ -1,0 +1,45 @@
+# ==============================
+# 📦 DÉPENDANCES (Le plus important)
+# ==============================
+node_modules/
+
+# ==============================
+# 🏗️ FICHIERS DE BUILD (Vue.js / Vite)
+# ==============================
+dist/
+dist-ssr/
+build/
+
+# ==============================
+# 🔒 SÉCURITÉ & ENVIRONNEMENT
+# ==============================
+# Ne jamais push les mots de passe, clés API ou configs locales
+.env
+.env.local
+.env.*.local
+
+# ==============================
+# 📝 LOGS ET ERREURS
+# ==============================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==============================
+# 💻 FICHIERS SYSTÈME (Mac / Windows)
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# 🛠️ FICHIERS DES ÉDITEURS (VS Code, IntelliJ...)
+# ==============================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
