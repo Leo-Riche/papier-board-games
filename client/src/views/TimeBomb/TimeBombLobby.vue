@@ -1,45 +1,41 @@
 <template>
-  <div class="lobby-container">
-    <div class="back-wrapper">
-      <BaseButton @click="$router.push('/')" variant="secondary">
-        ← Accueil
-      </BaseButton>
-    </div>
-    
-    <div class="lobby-box">
-      <h2>Lobby - Time Bomb 💣</h2>
-      
-      <div class="setup-section">
-        <BaseInput 
-          v-model="playerName" 
-          label="Ton Pseudo" 
-          placeholder="Ex: Sherlock_Holmes" 
-        />
-        
-        <div class="actions">
-          <BaseButton @click="createRoom" variant="primary">
-            Créer un salon
-          </BaseButton>
-          
-          <div class="separator">
-            <span class="line"></span>
-            <span class="text">OU</span>
-            <span class="line"></span>
+  <div class="lobby-wrapper">
+    <header class="lobby-header">
+      <div class="engraved-panel">
+        <h1 class="game-title">TIME BOMB</h1>
+        <p class="subtitle">Enquêtes de Scotland Yard</p>
+      </div>
+    </header>
+
+    <main class="lobby-main">
+      <div class="investigation-desk">
+        <div class="setup-form create-form">
+          <h2>Créer un salon</h2>
+          <div class="tb-input-group">
+            <input type="text" v-model="playerName" placeholder="Votre Pseudo" />
+            <div class="blueprint-line"></div>
           </div>
-          
-          <div class="join-group">
-            <BaseInput 
-              v-model="roomCode" 
-              label="Code du salon" 
-              placeholder="Ex: ABCD" 
-            />
-            <BaseButton @click="joinRoom" variant="secondary">
-              Rejoindre
-            </BaseButton>
+          <BaseButton variant="primary" @click="createRoom">Initialiser Room 🚀</BaseButton>
+        </div>
+
+        <div class="form-separator">
+          <div class="tb-gear">⚙️</div>
+        </div>
+
+        <div class="setup-form join-form">
+          <h2>Rejoindre un salon</h2>
+          <div class="tb-input-group">
+            <input type="text" v-model="playerName" placeholder="Votre Pseudo" />
+            <div class="blueprint-line"></div>
           </div>
+          <div class="tb-input-group">
+            <input type="text" v-model="roomCode" placeholder="Code (ex: A4X9P)" />
+            <div class="blueprint-line"></div>
+          </div>
+          <BaseButton variant="secondary" @click="joinRoom">Rejoindre 🚪</BaseButton>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -93,65 +89,49 @@ const joinRoom = () => {
 </script>
 
 <style scoped>
-.lobby-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  width: 100%;
-  background-color: #121212;
-  position: relative;
-  padding: 20px;
+.lobby-wrapper {
+  height: 100vh; display: flex; flex-direction: column;
+  background: url('@/assets/textures/old_paper.jpg') #2c3e50; /* Idéalement une texture d'ancien papier */
+  color: #4a3121;
 }
 
-.back-wrapper {
-  position: absolute;
-  top: 20px;
-  left: 20px;
+.engraved-panel {
+  text-align: center; padding: 30px;
+  background: linear-gradient(135deg, #1f4068, #0a1020); /* Bleu Sherlock */
+  border-bottom: 5px solid #a67c00;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.5);
 }
 
-.lobby-box {
-  background: #1a1a1a;
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  width: 100%;
-  max-width: 450px;
-  text-align: center;
+.game-title {
+  font-family: 'Times New Roman', serif;
+  font-size: 3.5rem; color: #ffde59; text-shadow: 0 2px 0 #8b5a2b; margin: 0;
 }
 
-h2 {
-  margin-bottom: 30px;
-  color: #ffde59;
+.subtitle { color: #bdc3c7; font-style: italic; margin-top: 5px; }
+
+.lobby-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+
+.investigation-desk {
+  display: flex; align-items: stretch; gap: 40px;
+  background: rgba(255,255,255,0.05); padding: 50px;
+  border-radius: 10px; border: 3px solid rgba(74,49,33,0.3);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
 }
 
-.setup-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+.setup-form { display: flex; flex-direction: column; align-items: center; gap: 20px; min-width: 300px;}
+.setup-form h2 { color: #8b1a10; font-family: serif; border-bottom: 2px solid #a67c00;}
 
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+.tb-input-group { position: relative; width: 100%; }
+.tb-input-group input {
+  width: 100%; padding: 12px 15px;
+  background: #f1e7d0; /* Papier jauni */
+  border: 2px solid #8b5a2b; color: black; font-weight: bold; font-size: 1.1rem;
 }
+.blueprint-line { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #daa520; transform: scaleX(0); transition: transform 0.3s ease; }
+.tb-input-group input:focus + .blueprint-line { transform: scaleX(1); }
 
-.separator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 0;
-}
-.line { flex: 1; height: 1px; background: #333; }
-.text { font-size: 0.8rem; color: #666; font-weight: bold; }
+.form-separator { display: flex; align-items: center; justify-content: center; }
+.tb-gear { font-size: 3rem; color: #8b5a2b; animation: spin 10s linear infinite; opacity: 0.5; }
 
-.join-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 15px;
-  border-radius: 10px;
-}
+@keyframes spin { 100% { transform: rotate(360deg); } }
 </style>

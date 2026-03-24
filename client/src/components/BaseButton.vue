@@ -1,71 +1,76 @@
 <template>
   <button 
-    :class="['base-button', variant, { 'is-loading': loading }]"
-    :disabled="disabled || loading"
+    class="tb-button" 
+    :class="variant" 
+    :disabled="disabled" 
     @click="$emit('click')"
   >
-    <span v-if="loading" class="loader"></span>
-    <slot v-else></slot> </button>
+    <div class="engraving">
+      <slot></slot>
+    </div>
+  </button>
 </template>
 
 <script setup>
 defineProps({
-  variant: {
-    type: String,
-    default: 'primary'
-  },
-  loading: Boolean,
-  disabled: Boolean
-})
-
-defineEmits(['click'])
+  variant: { type: String, default: 'secondary' }, // primary, secondary
+  disabled: { type: Boolean, default: false }
+});
+defineEmits(['click']);
 </script>
 
 <style scoped>
-.base-button {
-  padding: 12px 24px;
-  border-radius: 8px;
+.tb-button {
+  font-family: 'Georgia', serif;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 12px 30px;
   border: none;
-  font-weight: 600;
   cursor: pointer;
+  position: relative;
   transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 1rem;
+  min-width: 150px;
+  box-shadow: 0 4px #4a3121;
+  border-radius: 5px; /* Optionnel : adoucit un peu les angles */
 }
 
-/* Variantes de couleurs */
-.primary { background: #ffde59; color: #000; }
-.primary:hover { background: #ffe685; transform: scale(1.02); }
+/* === LA CORRECTION EST ICI === */
+.tb-button .engraving {
+  position: relative; /* Indispensable pour passer au-dessus du ::before */
+  z-index: 1;         /* Passe au premier plan */
+  transition: transform 0.1s ease;
+}
 
-.secondary { background: #34495e; color: #fff; }
-.secondary:hover { background: #465f78; }
+/* Texture Laiton/Cuivre par défaut en arrière-plan */
+.tb-button::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(145deg, #b87333, #e8a75e);
+  border: 3px solid #8b5a2b;
+  box-shadow: inset 0 2px rgba(255,255,255,0.3);
+  border-radius: 5px; /* Doit correspondre à la bordure du bouton */
+  z-index: 0; /* Reste en fond */
+}
 
-.danger { background: #e74c3c; color: #fff; }
-.danger:hover { background: #ff5e4d; }
+.tb-button.primary::before {
+  background: linear-gradient(145deg, #daa520, #ffde59);
+  border: 3px solid #a67c00;
+}
 
-.success { background: #2ecc71; color: #fff; }
+/* Texte gravé */
+.tb-button { color: #2c3e50; text-shadow: 0 1px rgba(255,255,255,0.2); }
+.tb-button.primary { color: #4a3121; text-shadow: 0 1px rgba(255,255,255,0.4); }
 
-/* État désactivé */
-.base-button:disabled {
-  opacity: 0.6;
+/* Hover effects */
+.tb-button:not(:disabled):hover { transform: translateY(1px); box-shadow: 0 3px #4a3121; }
+.tb-button:not(:disabled):hover::before { filter: brightness(1.1); }
+
+/* Click effect */
+.tb-button:not(:disabled):active { transform: translateY(4px); box-shadow: 0 0px #4a3121; }
+
+.tb-button:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
-}
-
-/* Animation Loader */
-.loader {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-radius: 50%;
-  border-top-color: #fff;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

@@ -12,12 +12,15 @@
     </div>
 
     <div v-if="amIHost">
-      <p v-if="players.length < 2" class="info-msg">
+      <p v-if="players.length < 4" class="info-msg">
         Attends au moins un autre joueur...
+      </p>
+      <p v-if="players.length > 9" class="info-msg">
+        Il y a trop de joueurs (max 8) ! Certains devront partir...
       </p>
       <BaseButton 
         variant="primary" 
-        :disabled="players.length < 2" 
+        :disabled="players.length < 4 || players.length > 8" 
         @click="$emit('start')"
       >
         LANCER LA PARTIE 🚀
@@ -44,10 +47,29 @@ defineEmits(['start']);
 </script>
 
 <style scoped>
-.lobby-waiting { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; text-align: center; }
-.players-list-container { background: rgba(0,0,0,0.3); padding: 25px; border-radius: 15px; min-width: 320px; }
-.players-list { list-style: none; padding: 0; margin-top: 15px; text-align: left; }
-.players-list li { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 1.1rem; }
-.is-me { color: #ffde59; font-weight: bold; }
-.info-msg { font-size: 0.9rem; color: #bdc3c7; font-style: italic; }
+.lobby-waiting { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center; }
+
+h2 { font-size: 2.5rem; color: #daa520; text-shadow: 0 2px black; font-family: serif;}
+
+.players-list-container {
+  background: url('@/assets/textures/blueprint.png') #0a1020; /* Idéalement texture blueprint bleu */
+  border: 5px solid #a67c00; padding: 30px; border-radius: 10px;
+  min-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+.players-list-container h3 { color: white; border-bottom: 2px solid rgba(255,222,89,0.3); padding-bottom: 10px;}
+
+.players-list { list-style: none; padding: 0; margin-top: 15px; }
+.players-list li {
+  padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 1.2rem; color: #bdc3c7; display: flex; align-items: center; justify-content: center;
+}
+.players-list li .badge { margin-right: 10px; opacity: 0.7;}
+
+.is-me {
+  background: rgba(255,222,89,0.1);
+  color: #ffde59; font-weight: bold; border-radius: 5px;
+}
+
+.info-msg { font-size: 1rem; color: #ffcc00; font-style: italic; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;}
 </style>
