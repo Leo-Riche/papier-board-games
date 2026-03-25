@@ -52,7 +52,7 @@ defineEmits(['start']);
 h2 { font-size: 2.5rem; color: #daa520; text-shadow: 0 2px black; font-family: serif;}
 
 .players-list-container {
-  background: url('@/assets/textures/blueprint.png') #0a1020; /* Idéalement texture blueprint bleu */
+  background: #0a1020;
   border: 5px solid #a67c00; padding: 30px; border-radius: 10px;
   min-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
 }
