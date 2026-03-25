@@ -92,7 +92,7 @@ const joinRoom = () => {
 <style scoped>
 .lobby-wrapper {
   height: 100vh; display: flex; flex-direction: column;
-  background: url('@/assets/textures/old_paper.jpg') #2c3e50; /* Idéalement une texture d'ancien papier */
+  background: #2c3e50;
   color: #4a3121;
 }
 

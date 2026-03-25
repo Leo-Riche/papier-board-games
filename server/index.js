@@ -12,12 +12,12 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: "*", // Autorise Vercel à se connecter
     methods: ["GET", "POST"]
   }
 });
 
-// 📦 TRÈS IMPORTANT : Le dictionnaire qui stocke les parties en cours
+// STOCKAGE GLOBAL DES PARTIES
 const activeGames = {}; 
 
 const updateRoomPlayers = (roomCode) => {
@@ -44,9 +44,7 @@ io.on('connection', (socket) => {
 
     const allSockets = Array.from(io.sockets.sockets.values());
     const duplicate = allSockets.find(s => 
-      s.playerName === name && 
-      s.id !== socket.id && 
-      s.rooms.has(cleanRoomCode)
+      s.playerName === name && s.id !== socket.id && s.rooms.has(cleanRoomCode)
     );
 
     if (duplicate) {
@@ -58,19 +56,18 @@ io.on('connection', (socket) => {
     socket.playerName = name; 
     socket.join(cleanRoomCode);
     
-    console.log(`👤 ${name} est maintenant actif dans la salle ${cleanRoomCode}`);
-
+    console.log(`👤 ${name} est actif dans ${cleanRoomCode}`);
     socket.emit('name_set', { name: name });
+    
     setTimeout(() => { updateRoomPlayers(cleanRoomCode); }, 100);
   });
 
-  // 🚀 C'EST ICI QUE TOUT CHANGE : Le lancement du jeu
   socket.on('start_timebomb', (roomCode) => {
     const cleanRoomCode = roomCode.trim();
     const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
 
     if (clients[0] !== socket.id) {
-      return console.log(`🚫 Tentative non autorisée par ${socket.id}`);
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
     }
     
     const playersData = clients.map(id => {
@@ -78,20 +75,17 @@ io.on('connection', (socket) => {
         return { id: id, name: s.playerName || "Anonyme" };
     });
 
-    // On instancie la CLASSE TimeBomb et on la stocke en mémoire
+    // L'AIGUILLEUR UTILISE LA CLASSE
     const game = new TimeBomb(cleanRoomCode, playersData, io);
     activeGames[cleanRoomCode] = game;
     
-    // On lance la partie (qui va appeler broadcastState et envoyer les images)
     game.start();
   });
 
-  // ✂️ ON ÉCOUTE LES COUPS DE CISEAUX
   socket.on('cut_wire', (data) => {
     const { roomCode, targetId, cardIndex, shooterName } = data;
     const game = activeGames[roomCode];
     
-    // Si la partie existe, on passe l'info au moteur du jeu
     if (game) {
       game.handleCut(targetId, cardIndex, shooterName);
     }
@@ -99,6 +93,7 @@ io.on('connection', (socket) => {
 
 });
 
+// On utilise le port dynamique de Render, ou 3000 par défaut
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Serveur et Socket.io lancés sur le port ${PORT}`);
