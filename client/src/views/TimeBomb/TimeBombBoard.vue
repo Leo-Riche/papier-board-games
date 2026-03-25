@@ -17,6 +17,7 @@
       :lastAction="lastAction"
       :myName="myName"
       :myRole="myRole"
+      :myRoleCard="myRoleCard"
       :myHand="myHand"
       :hasScissors="hasScissors"
       :otherPlayers="otherPlayers"
@@ -49,7 +50,7 @@
       <div class="board-background">
         <TimeBombActiveBoard 
           :roomCode="roomCode" :round="round" :defusesLeft="defusesLeft"
-          :lastAction="lastAction" :myName="myName" :myRole="myRole"
+          :lastAction="lastAction" :myName="myName" :myRole="myRole" :myRoleCard="myRoleCard"
           :myHand="myHand" :hasScissors="false" :otherPlayers="otherPlayers"
         />
       </div>
@@ -78,6 +79,7 @@ const defusesLeft = ref(0)
 const lastAction = ref('Le jeu va commencer...')
 const myName = ref('')
 const myRole = ref(null)
+const myRoleCard = ref('')
 const myHand = ref([])
 const hasScissors = ref(false)
 const otherPlayers = ref([])
@@ -115,6 +117,7 @@ onMounted(() => {
     round.value = data.round;
     defusesLeft.value = data.defusesLeft;
     myRole.value = data.myRole;
+    myRoleCard.value = data.myRoleCard;
     myHand.value = data.myHand;
     hasScissors.value = data.hasScissors;
     otherPlayers.value = data.opponents;

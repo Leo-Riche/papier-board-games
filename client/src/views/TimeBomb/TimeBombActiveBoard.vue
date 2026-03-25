@@ -14,20 +14,9 @@
       <div class="room-info">Code: <span class="engraved">{{ roomCode }}</span></div>
     </div>
 
-    <div class="action-desk">
-      <div class="action-log">{{ lastAction }}</div>
-      <div v-if="hasScissors" class="turn-indicator">
-        <span class="pliers">✂️</span> A VOUS de couper !
-      </div>
-    </div>
-
     <div class="opponents">
       <div v-for="p in otherPlayers" :key="p.id" class="player-area">
-        <p class="opponent-name">
-          <span class="badge">👤</span> {{ p.name || 'Anonyme' }} 
-          <span v-if="p.hasScissors" class="scissors-badge">✂️</span>
-        </p>
-        
+        <p class="opponent-name">👤 {{ p.name || 'Anonyme' }}</p>
         <div class="mini-hand">
           <TimeBombCard 
             v-for="(card, i) in p.hand" :key="i" 
@@ -40,11 +29,20 @@
       </div>
     </div>
 
+    <div class="center-table">
+      <div class="action-log">{{ lastAction }}</div>
+      <div v-if="hasScissors" class="turn-indicator">C'est à VOUS de couper !</div>
+    </div>
+
     <div class="my-area" :class="myRole?.toLowerCase()">
-      <div class="my-area-header">
-        <span class="joueur">👤 <strong>{{ myName }}</strong></span>
-        <div class="role-card">Rôle: <strong>{{ myRole }}</strong></div>
+      <div class="my-info">
+        <span>Joueur : 👤 <strong>{{ myName }}</strong></span>
       </div>
+      
+      <div class="player-role-display">
+        <img :src="getRoleCardImageUrl(myRoleCard)" alt="Ma Carte Rôle" />
+      </div>
+
       <div class="my-hand">
         <TimeBombCard 
           v-for="(card, i) in myHand" :key="i" 
@@ -66,12 +64,19 @@ defineProps({
   lastAction: String,
   myName: String,
   myRole: String,
+  myRoleCard: String,
   myHand: Array,
   hasScissors: Boolean,
   otherPlayers: Array
 });
 
 defineEmits(['cut']);
+
+const getRoleCardImageUrl = (roleCardName) => {
+  if (!roleCardName) return new URL('../../assets/images/roles/Sherlock1.svg', import.meta.url).href;
+  
+  return new URL(`../../assets/images/roles/${roleCardName}.svg`, import.meta.url).href;
+}
 </script>
 
 <style scoped>
@@ -97,10 +102,21 @@ defineEmits(['cut']);
 .action-log { background: #f1e7d0; color: #4a3121; padding: 10px 20px; border-radius: 5px; font-weight: bold; border: 2px solid #8b5a2b;}
 .turn-indicator { margin-top: 10px; color: #ffde59; font-weight: bold; font-size: 1.2rem; animation: pulse 1.5s infinite;}
 
+/* Styles pour les ciseaux dans l'indicateur de tour central */
+.scissors-icon-turn {
+  width: 5rem; height: 5rem; vertical-align: middle;
+}
+
 /* === Adversaires === */
 .opponents { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
 .player-area { text-align: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.1); }
 .opponent-name { font-weight: bold; color: white; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px;}
+
+/* Styles pour les ciseaux à côté du nom de l'adversaire */
+.scissors-icon-inline {
+  width: 4rem; height: 4rem; margin-left: 5px; vertical-align: middle;
+}
+
 .mini-hand { display: flex; gap: 5px; justify-content: center; margin-top: 10px; transform: scale(0.85); margin: -10px;}
 
 /* === Ma zone (Sherlock vs Moriarty) === */
@@ -122,6 +138,32 @@ defineEmits(['cut']);
 .my-area.moriarty .role-card { background: #c0392b; color: white; padding: 5px 15px; border-radius: 5px;}
 
 .my-hand { display: flex; gap: 15px; transform: scale(1.1); margin: 10px 0;}
+
+.player-role-display {
+  position: absolute;
+  bottom: 0px; /* Colle au bas de .my-area */
+  right: 20px; /* Padding latéral pour ne pas coller au bord de l'écran */
+  height: 180px; /* Hauteur de la carte */
+  transform: rotate(-5deg); /* Légère rotation pour un effet 'posé' naturel */
+  box-shadow: 0 5px 20px rgba(0,0,0,0.6); /* Ombre portée */
+  border-radius: 8px; /* Doit correspondre à l'arrondi du SVG */
+  z-index: 10; /* Assure que la carte est au-dessus du fond mais sous les menus de fin */
+  transition: all 0.3s ease;
+}
+
+.player-role-display img {
+  height: 100%; width: auto; /* Garde le ratio d'aspect */
+  border: 4px solid #daa520; /* Bordure laiton gravée */
+  border-radius: 8px;
+}
+
+/* Ajout d'une lueur d'équipe (Bleu Sherlock / Rouge Moriarty) */
+.my-area.sherlock .player-role-display {
+  filter: drop-shadow(0 0 10px #3498db);
+}
+.my-area.moriarty .player-role-display {
+  filter: drop-shadow(0 0 10px #e74c3c);
+}
 
 @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 </style>
