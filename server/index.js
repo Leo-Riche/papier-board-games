@@ -91,6 +91,11 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('send_player_chat', (data) => {
+    const { roomCode, text, sender } = data;
+    io.to(roomCode).emit('player_chat_message', { text, sender });
+  });
+
 });
 
 // On utilise le port dynamique de Render, ou 3000 par défaut

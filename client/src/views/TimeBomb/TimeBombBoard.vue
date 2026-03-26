@@ -14,14 +14,15 @@
       :roomCode="roomCode"
       :round="round"
       :defusesLeft="defusesLeft"
-      :lastAction="lastAction"
       :myName="myName"
       :myRole="myRole"
       :myRoleCard="myRoleCard"
       :myHand="myHand"
       :hasScissors="hasScissors"
       :otherPlayers="otherPlayers"
-      @cut="handleCut"
+      :gameMessages="gameMessages"
+      :isRedistributing="isRedistributing" @cut="handleCut"
+      @chatSend="handleChatSend" 
     />
 
     <div v-else-if="gameStatus === 'finished'" class="game-over-screen">
@@ -49,9 +50,17 @@
 
       <div class="board-background">
         <TimeBombActiveBoard 
-          :roomCode="roomCode" :round="round" :defusesLeft="defusesLeft"
-          :lastAction="lastAction" :myName="myName" :myRole="myRole" :myRoleCard="myRoleCard"
-          :myHand="myHand" :hasScissors="false" :otherPlayers="otherPlayers"
+          :roomCode="roomCode" 
+          :round="round" 
+          :defusesLeft="defusesLeft"
+          :myName="myName" 
+          :myRole="myRole"
+          :myRoleCard="myRoleCard"
+          :myHand="myHand" 
+          :hasScissors="false" 
+          :otherPlayers="otherPlayers"
+          :gameMessages="gameMessages"
+          :isRedistributing="false"
         />
       </div>
     </div>
@@ -67,7 +76,7 @@ import TimeBombActiveBoard from './TimeBombActiveBoard.vue'
 import BaseButton from '@/components/BaseButton.vue'
 
 const route = useRoute()
-const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket = io(socketUrl)
 const roomCode = route.params.id
 
@@ -77,13 +86,16 @@ const amIHost = ref(false)
 
 const round = ref(1)
 const defusesLeft = ref(0)
-const lastAction = ref('Le jeu va commencer...')
 const myName = ref('')
 const myRole = ref(null)
 const myRoleCard = ref('')
 const myHand = ref([])
 const hasScissors = ref(false)
 const otherPlayers = ref([])
+const gameMessages = ref([])
+
+// --- NOUVEAU : LA VARIABLE D'ÉTAT ---
+const isRedistributing = ref(false)
 
 const winner = ref('')
 const winReason = ref('')
@@ -106,14 +118,14 @@ onMounted(() => {
 
   socket.on('name_set', (data) => myName.value = data.name);
 
-  // Le jeu bascule sur le plateau actif
   socket.on('game_started', () => { 
     gameStatus.value = 'playing';
     winner.value = '';
     winReason.value = '';
+    gameMessages.value = [];
+    isRedistributing.value = false;
   });
 
-  // NOUVEAU : On reçoit l'état complet du plateau en temps réel
   socket.on('update_board_state', (data) => {
     round.value = data.round;
     defusesLeft.value = data.defusesLeft;
@@ -122,15 +134,24 @@ onMounted(() => {
     myHand.value = data.myHand;
     hasScissors.value = data.hasScissors;
     otherPlayers.value = data.opponents;
+    
+    // --- NOUVEAU : MISE À JOUR DE L'ÉTAT ---
+    isRedistributing.value = data.isRedistributing;
   });
 
-  socket.on('action_log', (msg) => { lastAction.value = msg; });
+  socket.on('action_log', (msg) => { 
+    gameMessages.value.push({ type: 'system', text: msg, timestamp: new Date() });
+  });
 
-  socket.on('game_over', ({ winner, reason }) => {
+  socket.on('player_chat_message', (msgData) => {
+    gameMessages.value.push({ type: 'player', sender: msgData.sender, text: msgData.text, timestamp: new Date() });
+  });
+
+  socket.on('game_over', ({ winner: winTeam, reason }) => {
     gameStatus.value = 'finished';
-    winner.value = data.winner;
-    winReason.value = data.reason;
-    lastAction.value = `${reason} Les ${winner} gagnent la partie !`;
+    winner.value = winTeam;
+    winReason.value = reason;
+    gameMessages.value.push({ type: 'system', text: `${reason} Les ${winTeam} gagnent la partie !`, timestamp: new Date() });
   });
 });
 
@@ -138,33 +159,27 @@ const startGame = () => socket.emit('start_timebomb', roomCode);
 
 const handleCut = ({ targetId, cardIndex }) => {
   if (!hasScissors.value) return alert("Ce n'est pas ton tour !");
+  // Sécurité supplémentaire côté client pour éviter les clics frénétiques
+  if (isRedistributing.value) return; 
+  
   socket.emit('cut_wire', { roomCode, targetId, cardIndex, shooterName: myName.value });
+}
+
+const handleChatSend = (text) => {
+  if (!text.trim()) return;
+  socket.emit('send_player_chat', { roomCode, text: text, sender: myName.value });
 }
 </script>
 
 <style scoped>
-.board-wrapper {
-  height: 100vh; display: flex; flex-direction: column;
-  background: #111; color: white; padding: 20px;
-}
-
-/* === Écran de fin de partie === */
+.board-wrapper { height: 100vh; display: flex; flex-direction: column; background: #2c3e50; color: white; padding: 20px; }
 .game-over-screen { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; }
-.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.2; pointer-events: none; z-index: 1; filter: sepia(0.5); }
-
-.results-box {
-  background: linear-gradient(135deg, #0a1020, #000); padding: 40px;
-  border-radius: 20px; text-align: center; z-index: 10;
-  box-shadow: 0 10px 50px rgba(0,0,0,0.8);
-  border: 5px double #a67c00; min-width: 400px;
-}
-
-.results-box h2 { font-size: 2.8rem; margin-bottom: 10px; color: white; font-family: serif;}
-.results-box h3 { font-size: 2rem; margin-bottom: 15px; text-transform: uppercase; font-weight: bold; }
-.results-box h3.sherlock { color: #3498db; text-shadow: 0 0 15px rgba(52,152,219,0.8);}
-.results-box h3.moriarty { color: #e74c3c; text-shadow: 0 0 15px rgba(231,76,60,0.8);}
-
-.reason { font-size: 1.3rem; margin-bottom: 25px; font-style: italic; color: #daa520; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
-.final-board-preview { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; margin-bottom: 25px; font-size: 1rem; color: #daa520; }
-.host-actions { display: flex; flex-direction: column; gap: 15px; }
+.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.3; pointer-events: none; z-index: 1; }
+.results-box { background: rgba(20, 20, 20, 0.95); padding: 40px; border-radius: 20px; text-align: center; z-index: 10; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 2px solid #ffde59; }
+.results-box h2 { font-size: 2.5rem; margin-bottom: 10px; }
+.results-box h3 { font-size: 2rem; margin-bottom: 20px; text-transform: uppercase; }
+.results-box h3.sherlock { color: #3498db; }
+.results-box h3.moriarty { color: #e74c3c; }
+.reason { font-size: 1.2rem; margin-bottom: 30px; font-style: italic; }
+.host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
 </style>

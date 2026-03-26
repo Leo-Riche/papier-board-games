@@ -23,6 +23,7 @@ class TimeBomb {
       defusesFound: 0,
       totalDefuses: playersData.length,
       status: 'playing',
+      isRedistributing: false,
       players: []
     };
   }
@@ -111,8 +112,9 @@ class TimeBomb {
     }
 
     if (this.state.turnCuts === this.state.players.length) {
+      this.state.isRedistributing = true;
       this.io.to(this.roomCode).emit('action_log', `Fin de la manche ${this.state.round}. Redistribution...`);
-      setTimeout(() => this.startNextRound(), 5000);
+      setTimeout(() => this.startNextRound(), 2500);
     } 
 
     this.broadcastState();
@@ -141,7 +143,13 @@ class TimeBomb {
       p.hand = newDeck.splice(0, cardsPerPlayer).map(type => ({ type, isRevealed: false }));
     });
 
+    const playerWithScissors = this.state.players.find(p => p.hasScissors);
+    const scissorsHolderName = playerWithScissors ? playerWithScissors.name : "Quelqu'un";
+
+    this.io.to(this.roomCode).emit('action_log', `Manche ${this.state.round} démarrée. Les ciseaux sont chez ${scissorsHolderName} !`);
+
     this.state.turnCuts = 0;
+    this.state.isRedistributing = false;
     this.broadcastState();
   }
 
@@ -173,7 +181,8 @@ class TimeBomb {
         myRoleCard: player.roleCard,
         myHand: player.hand,
         hasScissors: player.hasScissors,
-        opponents: opponents
+        opponents: opponents,
+        isRedistributing: this.state.isRedistributing
       });
     });
   }
