@@ -14,6 +14,7 @@
       :roomCode="roomCode"
       :round="round"
       :defusesLeft="defusesLeft"
+      :cutsLeft="cutsLeft"
       :myName="myName"
       :myRole="myRole"
       :myRoleCard="myRoleCard"
@@ -21,7 +22,9 @@
       :hasScissors="hasScissors"
       :otherPlayers="otherPlayers"
       :gameMessages="gameMessages"
-      :isRedistributing="isRedistributing" @cut="handleCut"
+      :isRedistributing="isRedistributing"
+      :protectedPlayerId="protectedPlayerId"
+      @cut="handleCut"
       @chatSend="handleChatSend" 
     />
 
@@ -31,8 +34,13 @@
         <h3 :class="winner.toLowerCase()">Victoire de l'équipe {{ winner }} 🏆</h3>
         <p class="reason">{{ winReason }}</p>
 
-        <div class="final-board-preview">
-          <p>Regardez le plateau derrière pour voir les rôles de chacun !</p>
+        <div class="revealed-roles">
+          <h4>Identités Révélées :</h4>
+          <ul>
+            <li v-for="p in finalPlayers" :key="p.name" :class="p.role.toLowerCase()">
+              👤 <strong>{{ p.name }}</strong> était {{ p.role }}
+            </li>
+          </ul>
         </div>
 
         <div v-if="amIHost" class="host-actions">
@@ -53,6 +61,7 @@
           :roomCode="roomCode" 
           :round="round" 
           :defusesLeft="defusesLeft"
+          :cutsLeft="cutsLeft"
           :myName="myName" 
           :myRole="myRole"
           :myRoleCard="myRoleCard"
@@ -61,6 +70,7 @@
           :otherPlayers="otherPlayers"
           :gameMessages="gameMessages"
           :isRedistributing="false"
+          :protectedPlayerId="null"
         />
       </div>
     </div>
@@ -86,6 +96,7 @@ const amIHost = ref(false)
 
 const round = ref(1)
 const defusesLeft = ref(0)
+const cutsLeft = ref(0)
 const myName = ref('')
 const myRole = ref(null)
 const myRoleCard = ref('')
@@ -93,12 +104,12 @@ const myHand = ref([])
 const hasScissors = ref(false)
 const otherPlayers = ref([])
 const gameMessages = ref([])
-
-// --- NOUVEAU : LA VARIABLE D'ÉTAT ---
 const isRedistributing = ref(false)
+const protectedPlayerId = ref(null) // 👈 La variable est bien là
 
 const winner = ref('')
 const winReason = ref('')
+const finalPlayers = ref([]) 
 
 onMounted(() => {
   socket.on('connect', () => {
@@ -124,19 +135,21 @@ onMounted(() => {
     winReason.value = '';
     gameMessages.value = [];
     isRedistributing.value = false;
+    protectedPlayerId.value = null;
+    finalPlayers.value = [];
   });
 
   socket.on('update_board_state', (data) => {
     round.value = data.round;
     defusesLeft.value = data.defusesLeft;
+    cutsLeft.value = data.cutsLeft;
     myRole.value = data.myRole;
     myRoleCard.value = data.myRoleCard;
     myHand.value = data.myHand;
     hasScissors.value = data.hasScissors;
     otherPlayers.value = data.opponents;
-    
-    // --- NOUVEAU : MISE À JOUR DE L'ÉTAT ---
     isRedistributing.value = data.isRedistributing;
+    protectedPlayerId.value = data.protectedPlayerId; // 👈 Elle est bien mise à jour !
   });
 
   socket.on('action_log', (msg) => { 
@@ -147,11 +160,12 @@ onMounted(() => {
     gameMessages.value.push({ type: 'player', sender: msgData.sender, text: msgData.text, timestamp: new Date() });
   });
 
-  socket.on('game_over', ({ winner: winTeam, reason }) => {
+  socket.on('game_over', (data) => {
     gameStatus.value = 'finished';
-    winner.value = winTeam;
-    winReason.value = reason;
-    gameMessages.value.push({ type: 'system', text: `${reason} Les ${winTeam} gagnent la partie !`, timestamp: new Date() });
+    winner.value = data.winner;
+    winReason.value = data.reason;
+    finalPlayers.value = data.players;
+    gameMessages.value.push({ type: 'system', text: `${data.reason} Les ${data.winner} gagnent !`, timestamp: new Date() });
   });
 });
 
@@ -159,9 +173,7 @@ const startGame = () => socket.emit('start_timebomb', roomCode);
 
 const handleCut = ({ targetId, cardIndex }) => {
   if (!hasScissors.value) return alert("Ce n'est pas ton tour !");
-  // Sécurité supplémentaire côté client pour éviter les clics frénétiques
   if (isRedistributing.value) return; 
-  
   socket.emit('cut_wire', { roomCode, targetId, cardIndex, shooterName: myName.value });
 }
 
@@ -175,11 +187,19 @@ const handleChatSend = (text) => {
 .board-wrapper { height: 100vh; display: flex; flex-direction: column; background: #2c3e50; color: white; padding: 20px; }
 .game-over-screen { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; }
 .board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.3; pointer-events: none; z-index: 1; }
-.results-box { background: rgba(20, 20, 20, 0.95); padding: 40px; border-radius: 20px; text-align: center; z-index: 10; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 2px solid #ffde59; }
+.results-box { background: rgba(20, 20, 20, 0.95); padding: 40px; border-radius: 20px; text-align: center; z-index: 10; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 2px solid #ffde59; max-width: 600px; width: 100%;}
 .results-box h2 { font-size: 2.5rem; margin-bottom: 10px; }
 .results-box h3 { font-size: 2rem; margin-bottom: 20px; text-transform: uppercase; }
 .results-box h3.sherlock { color: #3498db; }
 .results-box h3.moriarty { color: #e74c3c; }
-.reason { font-size: 1.2rem; margin-bottom: 30px; font-style: italic; }
-.host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+.reason { font-size: 1.2rem; margin-bottom: 20px; font-style: italic; }
+
+.revealed-roles { margin: 25px 0; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; }
+.revealed-roles h4 { margin-bottom: 15px; color: #ffde59; font-size: 1.2rem; letter-spacing: 1px; }
+.revealed-roles ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.revealed-roles li { padding: 8px 15px; border-radius: 20px; font-size: 1.1rem; border: 2px solid transparent;}
+.revealed-roles li.sherlock { background: rgba(52, 152, 219, 0.15); border-color: #3498db; color: #3498db; }
+.revealed-roles li.moriarty { background: rgba(231, 76, 60, 0.15); border-color: #e74c3c; color: #e74c3c; }
+
+.host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; align-items: center;}
 </style>

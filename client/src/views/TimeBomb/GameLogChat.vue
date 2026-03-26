@@ -25,31 +25,29 @@
 </template>
 
 <script setup>
-import { ref, onUpdated } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 
 const props = defineProps({
-  messages: Array // Contient { type, text, sender, timestamp }
+  messages: Array 
 });
 
 const emit = defineEmits(['send']);
 
 const newMessage = ref('');
 const messagesHistoryContainer = ref(null);
-
 const sendMessage = () => {
   if (!newMessage.value.trim()) return;
   emit('send', newMessage.value);
-  newMessage.value = ''; // Vide l'input après envoi
+  newMessage.value = ''; 
 }
 
-// Auto-scroll en bas à chaque nouveau message
-onUpdated(() => {
+watch(() => props.messages, async () => {
+  await nextTick(); 
+  
   if (messagesHistoryContainer.value) {
-    setTimeout(() => {
-      messagesHistoryContainer.value.scrollTop = messagesHistoryContainer.value.scrollHeight;
-    }, 50);
+    messagesHistoryContainer.value.scrollTop = messagesHistoryContainer.value.scrollHeight;
   }
-});
+}, { deep: true });
 </script>
 
 <style scoped>

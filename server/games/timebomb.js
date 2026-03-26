@@ -17,13 +17,15 @@ class TimeBomb {
     this.io = io;
     this.players = playersData; 
     
+    // L'état central de la partie
     this.state = {
       round: 1,
       turnCuts: 0,
       defusesFound: 0,
       totalDefuses: playersData.length,
       status: 'playing',
-      isRedistributing: false,
+      isRedistributing: false, // Bloque les clics pendant la pause
+      lastShooterId: null,     // Règle Anti Ping-Pong
       players: []
     };
   }
@@ -31,13 +33,14 @@ class TimeBomb {
   start() {
     const nbPlayers = this.players.length;
     
+    // 1. Logique des rôles
     let nbSherlock, nbMoriarty;
     if (nbPlayers >= 4 && nbPlayers <= 5) {
-      nbSherlock = 3; nbMoriarty = 2;
+      nbSherlock = 3; nbMoriarty = 2; 
     } else if (nbPlayers === 6) {
-      nbSherlock = 4; nbMoriarty = 2;
+      nbSherlock = 4; nbMoriarty = 2; 
     } else if (nbPlayers >= 7 && nbPlayers <= 8) {
-      nbSherlock = 5; nbMoriarty = 3;
+      nbSherlock = 5; nbMoriarty = 3; 
     } else {
       nbMoriarty = Math.floor(nbPlayers / 2);
       nbSherlock = nbPlayers - nbMoriarty;
@@ -50,7 +53,6 @@ class TimeBomb {
     const selectedMoriartys = shuffledMoriartys.slice(0, nbMoriarty);
 
     const finalRoleCardsPool = [...selectedSherlocks, ...selectedMoriartys];
-
     const assignedRoleCards = shuffle(finalRoleCardsPool).slice(0, nbPlayers);
     
     let deck = ['bomb'];
@@ -66,19 +68,21 @@ class TimeBomb {
     
     deck = shuffle(deck);
 
+    // Tirage au sort du premier joueur
+    const startingPlayerIndex = Math.floor(Math.random() * nbPlayers);
+
+    // 3. Distribution initiale (Manche 1)
     this.state.players = this.players.map((p, index) => {
-      
       const specificRoleCard = assignedRoleCards[index];
-      
       const roleType = specificRoleCard.startsWith('Sherlock') ? 'Sherlock' : 'Moriarty';
 
       return {
         id: p.id,
         name: p.name,
-        role: roleType,
-        roleCard: specificRoleCard,
+        role: roleType,            
+        roleCard: specificRoleCard, 
         hand: deck.splice(0, 5).map(type => ({ type: type, isRevealed: false })),
-        hasScissors: index === 0
+        hasScissors: index === startingPlayerIndex 
       };
     });
 
@@ -88,20 +92,33 @@ class TimeBomb {
 
   handleCut(targetId, cardIndex, shooterName) {
     if (this.state.status !== 'playing') return;
+    if (this.state.isRedistributing) return; // Sécurité redistribution
+
+    const currentShooter = this.state.players.find(p => p.hasScissors);
+    if (!currentShooter) return;
+
+    // SÉCURITÉ ANTI PING-PONG
+    if (targetId === this.state.lastShooterId) return;
 
     const targetPlayer = this.state.players.find(p => p.id === targetId);
     const card = targetPlayer.hand[cardIndex];
 
     if (card.isRevealed) return;
 
+    // 1. On révèle la carte
     card.isRevealed = true;
     this.state.turnCuts++;
 
+    // 2. On mémorise l'ID du tireur AVANT de transférer les ciseaux
+    this.state.lastShooterId = currentShooter.id;
+
+    // 3. Transfert des ciseaux
     this.state.players.forEach(p => p.hasScissors = false);
     targetPlayer.hasScissors = true;
 
     this.io.to(this.roomCode).emit('action_log', `${shooterName} a coupé chez ${targetPlayer.name} !`);
 
+    // 4. Vérification des conditions de victoire
     if (card.type === 'bomb') {
       return this.endGame('Moriarty', '💥 BOUM ! La bombe a explosé.');
     } else if (card.type === 'defuse') {
@@ -111,6 +128,7 @@ class TimeBomb {
       }
     }
 
+    // 5. Vérification de fin de manche
     if (this.state.turnCuts === this.state.players.length) {
       this.state.isRedistributing = true;
       this.io.to(this.roomCode).emit('action_log', `Fin de la manche ${this.state.round}. Redistribution...`);
@@ -132,24 +150,26 @@ class TimeBomb {
       p.hand.forEach(c => {
         if (!c.isRevealed) newDeck.push(c.type);
       });
-      p.hand = [];
+      p.hand = []; 
     });
 
     newDeck = shuffle(newDeck);
 
-    // Redistribution
     const cardsPerPlayer = newDeck.length / this.state.players.length;
     this.state.players.forEach(p => {
       p.hand = newDeck.splice(0, cardsPerPlayer).map(type => ({ type, isRevealed: false }));
     });
 
+    // Reset des sécurités pour la nouvelle manche
+    this.state.turnCuts = 0; 
+    this.state.isRedistributing = false;
+    this.state.lastShooterId = null; // Reset du Ping-Pong
+
+    // Annonce du porteur de ciseaux
     const playerWithScissors = this.state.players.find(p => p.hasScissors);
     const scissorsHolderName = playerWithScissors ? playerWithScissors.name : "Quelqu'un";
-
     this.io.to(this.roomCode).emit('action_log', `Manche ${this.state.round} démarrée. Les ciseaux sont chez ${scissorsHolderName} !`);
 
-    this.state.turnCuts = 0;
-    this.state.isRedistributing = false;
     this.broadcastState();
   }
 
@@ -158,11 +178,18 @@ class TimeBomb {
     this.state.players.forEach(p => {
       p.hand.forEach(c => c.isRevealed = true);
     });
+    
+    // On prépare la liste des rôles dévoilés
+    const revealedPlayers = this.state.players.map(p => ({
+      name: p.name,
+      role: p.role
+    }));
+
     this.broadcastState(); 
-    this.io.to(this.roomCode).emit('game_over', { winner, reason });
+    this.io.to(this.roomCode).emit('game_over', { winner, reason, players: revealedPlayers });
   }
 
-  // Envoie à chaque joueur uniquement ce qu'il a le droit de voir
+  // C'est ici que ça bloquait : il manquait l'envoi de plusieurs variables !
   broadcastState() {
     this.state.players.forEach(player => {
       const opponents = this.state.players
@@ -177,12 +204,14 @@ class TimeBomb {
       this.io.to(player.id).emit('update_board_state', {
         round: this.state.round,
         defusesLeft: this.state.totalDefuses - this.state.defusesFound,
+        cutsLeft: this.state.players.length - this.state.turnCuts,
         myRole: player.role,
         myRoleCard: player.roleCard,
         myHand: player.hand,
         hasScissors: player.hasScissors,
         opponents: opponents,
-        isRedistributing: this.state.isRedistributing
+        isRedistributing: this.state.isRedistributing,
+        protectedPlayerId: this.state.lastShooterId
       });
     });
   }
