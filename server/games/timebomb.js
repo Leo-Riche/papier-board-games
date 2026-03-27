@@ -17,15 +17,14 @@ class TimeBomb {
     this.io = io;
     this.players = playersData; 
     
-    // L'état central de la partie
     this.state = {
       round: 1,
       turnCuts: 0,
       defusesFound: 0,
       totalDefuses: playersData.length,
       status: 'playing',
-      isRedistributing: false, // Bloque les clics pendant la pause
-      lastShooterId: null,     // Règle Anti Ping-Pong
+      isRedistributing: false,
+      lastShooterId: null,
       players: []
     };
   }
@@ -68,7 +67,6 @@ class TimeBomb {
     
     deck = shuffle(deck);
 
-    // Tirage au sort du premier joueur
     const startingPlayerIndex = Math.floor(Math.random() * nbPlayers);
 
     // 3. Distribution initiale (Manche 1)
@@ -92,12 +90,11 @@ class TimeBomb {
 
   handleCut(targetId, cardIndex, shooterName) {
     if (this.state.status !== 'playing') return;
-    if (this.state.isRedistributing) return; // Sécurité redistribution
+    if (this.state.isRedistributing) return;
 
     const currentShooter = this.state.players.find(p => p.hasScissors);
     if (!currentShooter) return;
 
-    // SÉCURITÉ ANTI PING-PONG
     if (targetId === this.state.lastShooterId) return;
 
     const targetPlayer = this.state.players.find(p => p.id === targetId);
@@ -160,12 +157,10 @@ class TimeBomb {
       p.hand = newDeck.splice(0, cardsPerPlayer).map(type => ({ type, isRevealed: false }));
     });
 
-    // Reset des sécurités pour la nouvelle manche
     this.state.turnCuts = 0; 
     this.state.isRedistributing = false;
-    this.state.lastShooterId = null; // Reset du Ping-Pong
+    this.state.lastShooterId = null;
 
-    // Annonce du porteur de ciseaux
     const playerWithScissors = this.state.players.find(p => p.hasScissors);
     const scissorsHolderName = playerWithScissors ? playerWithScissors.name : "Quelqu'un";
     this.io.to(this.roomCode).emit('action_log', `Manche ${this.state.round} démarrée. Les ciseaux sont chez ${scissorsHolderName} !`);
@@ -179,7 +174,6 @@ class TimeBomb {
       p.hand.forEach(c => c.isRevealed = true);
     });
     
-    // On prépare la liste des rôles dévoilés
     const revealedPlayers = this.state.players.map(p => ({
       name: p.name,
       role: p.role
@@ -189,7 +183,6 @@ class TimeBomb {
     this.io.to(this.roomCode).emit('game_over', { winner, reason, players: revealedPlayers });
   }
 
-  // C'est ici que ça bloquait : il manquait l'envoi de plusieurs variables !
   broadcastState() {
     this.state.players.forEach(player => {
       const opponents = this.state.players
@@ -214,6 +207,18 @@ class TimeBomb {
         protectedPlayerId: this.state.lastShooterId
       });
     });
+  }
+
+  reconnectPlayer(newSocketId, playerName) {
+    if (this.state.status !== 'playing') return false;
+
+    const player = this.state.players.find(p => p.name === playerName);
+    
+    if (player) {
+      player.id = newSocketId;
+      return true;
+    }
+    return false;
   }
 }
 

@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import TimeBombLobby from '../views/TimeBomb/TimeBombLobby.vue'
 import TimeBombBoard from '../views/TimeBomb/TimeBombBoard.vue'
+import TimeBombJoin from '../views/TimeBomb/TimeBombJoin.vue'
 
 const routes = [
   {
@@ -20,6 +21,12 @@ const routes = [
     path: '/timebomb/game/:id',
     name: 'TimeBombBoard',
     component: TimeBombBoard,
+    props: true
+  },
+  {
+    path: '/join/:id',
+    name: 'TimeBombJoin',
+    component: TimeBombJoin,
     props: true
   }
 ]

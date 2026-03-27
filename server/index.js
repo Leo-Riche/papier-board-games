@@ -59,6 +59,19 @@ io.on('connection', (socket) => {
     console.log(`👤 ${name} est actif dans ${cleanRoomCode}`);
     socket.emit('name_set', { name: name });
     
+    if (activeGames[cleanRoomCode] && activeGames[cleanRoomCode].state.status === 'playing') {
+
+      const hasReconnected = activeGames[cleanRoomCode].reconnectPlayer(socket.id, name);
+      
+      if (hasReconnected) {
+        console.log(`🔄 Reconnexion réussie pour ${name} dans ${cleanRoomCode}`);
+        socket.emit('game_started');
+        activeGames[cleanRoomCode].broadcastState();
+
+        return; 
+      }
+    }
+    
     setTimeout(() => { updateRoomPlayers(cleanRoomCode); }, 100);
   });
 
@@ -75,7 +88,6 @@ io.on('connection', (socket) => {
         return { id: id, name: s.playerName || "Anonyme" };
     });
 
-    // L'AIGUILLEUR UTILISE LA CLASSE
     const game = new TimeBomb(cleanRoomCode, playersData, io);
     activeGames[cleanRoomCode] = game;
     
@@ -84,7 +96,8 @@ io.on('connection', (socket) => {
 
   socket.on('cut_wire', (data) => {
     const { roomCode, targetId, cardIndex, shooterName } = data;
-    const game = activeGames[roomCode];
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode]; 
     
     if (game) {
       game.handleCut(targetId, cardIndex, shooterName);

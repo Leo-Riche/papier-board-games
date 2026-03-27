@@ -1,6 +1,9 @@
 <template>
   <div class="lobby-waiting">
     <h2>Salle : {{ roomCode }}</h2>
+    <button class="share-btn" @click="copyJoinLink">
+      {{ copyButtonText }}
+    </button>
     
     <div class="players-list-container">
       <h3>Joueurs connectés ({{ players.length }}) :</h3>
@@ -35,8 +38,27 @@
 
 <script setup>
 import BaseButton from '@/components/BaseButton.vue'
+import { ref } from 'vue';
 
-defineProps({
+const copyButtonText = ref('🔗 Copier le lien d\'invitation')
+
+const copyJoinLink = async () => {
+  const joinUrl = `${window.location.origin}/join/${props.roomCode}`
+  
+  try {
+    await navigator.clipboard.writeText(joinUrl)
+    copyButtonText.value = '✅ Lien copié !'
+    
+    setTimeout(() => {
+      copyButtonText.value = '🔗 Copier le lien d\'invitation'
+    }, 2000)
+  } catch (err) {
+    console.error('Erreur lors de la copie :', err)
+    copyButtonText.value = '❌ Erreur de copie'
+  }
+}
+
+const props = defineProps({
   roomCode: String,
   players: Array,
   socketId: String,
@@ -72,4 +94,12 @@ h2 { font-size: 2.5rem; color: #daa520; text-shadow: 0 2px black; font-family: s
 }
 
 .info-msg { font-size: 1rem; color: #ffcc00; font-style: italic; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;}
+
+.share-btn {
+  background: #3498db; color: white; border: none; padding: 8px 15px;
+  border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px;
+  transition: background 0.2s;
+}
+.share-btn:hover { background: #2980b9; }
+
 </style>

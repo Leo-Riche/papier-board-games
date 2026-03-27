@@ -59,7 +59,7 @@
 
     <div class="my-area" :class="myRole?.toLowerCase()">
       <div class="my-info">
-        <span>Joueur : 👤 **{{ myName }}**</span>
+        <span><strong>{{ myName }}</strong></span>
       </div>
       
       <div class="player-chat-display">
