@@ -18,12 +18,12 @@
       <p v-if="players.length < 4" class="info-msg">
         Attends au moins un autre joueur...
       </p>
-      <p v-if="players.length > 9" class="info-msg">
-        Il y a trop de joueurs (max 8) ! Certains devront partir...
+      <p v-if="players.length > 10" class="info-msg">
+        Il y a trop de joueurs (max 10) ! Certains devront partir...
       </p>
       <BaseButton 
         variant="primary" 
-        :disabled="players.length < 4 || players.length > 8" 
+        :disabled="players.length < 4 || players.length > 10" 
         @click="$emit('start')"
       >
         LANCER LA PARTIE 🚀

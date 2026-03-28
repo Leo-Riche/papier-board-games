@@ -1,7 +1,7 @@
 // server/games/timebomb.js
 
-const availableSherlockCards = ['Sherlock1', 'Sherlock2', 'Sherlock3', 'Sherlock4', 'Sherlock5'];
-const availableMoriartyCards = ['Moriarty1', 'Moriarty2', 'Moriarty3'];
+const availableSherlockCards = ['Sherlock1', 'Sherlock2', 'Sherlock3', 'Sherlock4', 'Sherlock5', 'Sherlock1', 'Sherlock2'];
+const availableMoriartyCards = ['Moriarty1', 'Moriarty2', 'Moriarty3', 'Moriarty1'];
 
 const shuffle = (array) => {
   for (let i = array.length - 1; i > 0; i--) {
@@ -42,7 +42,14 @@ class TimeBomb {
       nbSherlock = 4; nbMoriarty = 2; 
     } else if (nbPlayers >= 7 && nbPlayers <= 8) {
       nbSherlock = 5; nbMoriarty = 3; 
-    } else {
+    }
+    else if (nbPlayers === 9) {
+      nbMoriarty = Math.random() < 0.5 ? 3 : 4; 
+      nbSherlock = nbPlayers - nbMoriarty;
+    } else if (nbPlayers === 10) {
+      nbSherlock = 6; nbMoriarty = 4; 
+    } 
+    else {
       nbMoriarty = Math.floor(nbPlayers / 2);
       nbSherlock = nbPlayers - nbMoriarty;
     }

@@ -41,6 +41,7 @@ io.on('connection', (socket) => {
   
   socket.on('set_player_name', ({ name, roomCode }) => {
     const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
 
     const allSockets = Array.from(io.sockets.sockets.values());
     const duplicate = allSockets.find(s => 
@@ -51,6 +52,11 @@ io.on('connection', (socket) => {
       console.log(`⚠️ Nettoyage du fantôme pour ${name}`);
       duplicate.leave(cleanRoomCode);
       duplicate.disconnect(true);
+    }
+
+    if (!duplicate && clients.length >= 10) {
+      socket.emit('room_full', 'La salle est pleine (10 joueurs maximum) !');
+      return; 
     }
 
     socket.playerName = name; 

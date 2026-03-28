@@ -82,13 +82,14 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 import TimeBombLobbyWait from './TimeBombLobbyWait.vue'
 import TimeBombActiveBoard from './TimeBombActiveBoard.vue' 
 import BaseButton from '@/components/BaseButton.vue'
 
 const route = useRoute()
+const router = useRouter()
 const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket = io(socketUrl)
 const roomCode = route.params.id
@@ -120,6 +121,12 @@ onMounted(() => {
     const savedName = localStorage.getItem('temp_player_name');
     if (savedName) socket.emit('set_player_name', { name: savedName, roomCode });
     else socket.emit('join_room', roomCode);
+  });
+
+  socket.on('room_full', (message) => {
+    alert(message);
+    socket.disconnect();
+    router.push('/');
   });
 
   socket.on('update_players_list', (players) => {
