@@ -25,6 +25,7 @@
       :gameMessages="gameMessages"
       :isRedistributing="isRedistributing"
       :protectedPlayerId="protectedPlayerId"
+      :allAnnounced="allAnnounced"
       @cut="handleCut"
       @announce="handleAnnounce"
       @chatSend="handleChatSend" 
@@ -74,6 +75,7 @@
           :gameMessages="gameMessages"
           :isRedistributing="false"
           :protectedPlayerId="null"
+          :allAnnounced="allAnnounced"
         />
       </div>
     </div>
@@ -111,6 +113,7 @@ const otherPlayers = ref([])
 const gameMessages = ref([])
 const isRedistributing = ref(false)
 const protectedPlayerId = ref(null)
+const allAnnounced = ref(false)
 
 const winner = ref('')
 const winReason = ref('')
@@ -162,6 +165,7 @@ onMounted(() => {
     otherPlayers.value = data.opponents;
     isRedistributing.value = data.isRedistributing;
     protectedPlayerId.value = data.protectedPlayerId;
+    allAnnounced.value = data.allAnnounced;
   });
 
   socket.on('action_log', (msg) => { 

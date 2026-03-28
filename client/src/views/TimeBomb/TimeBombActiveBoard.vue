@@ -1,5 +1,5 @@
 <template>
-  <div class="game-active">
+  <div class="game-active" :class="{ 'holding-scissors': hasScissors && allAnnounced }">
     <div class="game-header">
       <div class="blueprints-left">
         <div class="stat-box manche">
@@ -36,15 +36,16 @@
             | <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" />
           </span>
         </div>
-        <div class="mini-hand">
+        <TransitionGroup name="deal-opponent" tag="div" class="mini-hand">
           <TimeBombCard 
-            v-for="(card, i) in p.hand" :key="i" 
+            v-for="(card, i) in p.hand" 
+            :key="`opp-${round}-${i}`" 
             :type="card.type" 
             :is-revealed="card.isRevealed"
-            :can-be-cut="hasScissors && !card.isRevealed && p.id !== protectedPlayerId"
+            :can-be-cut="hasScissors && allAnnounced && !card.isRevealed && p.id !== protectedPlayerId"
             @cut="$emit('cut', { targetId: p.id, cardIndex: i })"
           />
-        </div>
+        </TransitionGroup>
       </div>
     </div>
 
@@ -52,6 +53,9 @@
       <div class="turn-status-panel">
         <div v-if="isRedistributing" class="turn-indicator redistributing">
           ⏳ Redistribution en cours...
+        </div>
+        <div v-else-if="!allAnnounced" class="turn-indicator waiting">
+          ⏳ En attente des annonces ({{ Object.keys(announcements).length }} / {{ otherPlayers.length + 1 }})...
         </div>
         <div v-else-if="hasScissors" class="turn-indicator my-turn">
           <img src="@/assets/images/Ciseaux.svg" alt="Ciseaux" class="ui-scissors-icon" /> 
@@ -102,14 +106,15 @@
         <strong v-if="announcements[myName].hasBomb"> et <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /></strong>
       </div>
 
-      <div class="my-hand">
+      <TransitionGroup name="deal-me" tag="div" class="my-hand">
         <TimeBombCard 
-          v-for="(card, i) in myHand" :key="i" 
+          v-for="(card, i) in myHand" 
+          :key="`me-${round}-${i}`" 
           :type="card.type" 
           :is-revealed="true"
           :wasCut="card.isRevealed"
         />
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
@@ -133,7 +138,8 @@ const props = defineProps({
   otherPlayers: Array,
   gameMessages: Array,
   isRedistributing: Boolean,
-  protectedPlayerId: String 
+  protectedPlayerId: String,
+  allAnnounced: Boolean
 });
 
 const emit = defineEmits(['cut', 'chatSend', 'announce']);
@@ -186,6 +192,11 @@ const getRoleCardImageUrl = (roleCardName) => {
 .turn-indicator.other-turn { color: #bdc3c7; font-style: italic;}
 .turn-indicator.other-turn strong { color: #ffde59; font-style: normal; font-size: 1.4rem; text-shadow: 0 0 10px rgba(255, 222, 89, 0.3);}
 .turn-indicator.redistributing { color: #3498db; font-style: italic; animation: pulse 1.5s infinite; }
+.turn-indicator.waiting {
+  color: #f39c12; 
+  font-style: italic; 
+  animation: pulse 2s infinite;
+}
 
 .ui-scissors-icon { width: 1.5rem; height: auto; vertical-align: middle; margin: 0 5px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 
@@ -231,6 +242,54 @@ const getRoleCardImageUrl = (roleCardName) => {
   margin-left: 4px;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
 }
+
+.game-active.holding-scissors {
+  cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, crosshair;
+}
+
+.holding-scissors .mini-hand * {
+  cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, pointer !important;
+}
+
+.holding-scissors .player-chat-display,
+.holding-scissors .announce-panel,
+.holding-scissors button,
+.holding-scissors input {
+  cursor: default;
+}
+
+.player-area.is-protected,
+.player-area.is-protected * {
+  cursor: not-allowed !important;
+}
+
+.deal-opponent-enter-active, .deal-opponent-leave-active {
+  transition: all 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.deal-opponent-enter-from, .deal-opponent-leave-to {
+  opacity: 0;
+  transform: translateY(150px) scale(0.2) rotate(180deg);
+}
+
+.deal-opponent-leave-active {
+  position: absolute;
+}
+
+.deal-me-enter-active, .deal-me-leave-active {
+  transition: all 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.deal-me-enter-from, .deal-me-leave-to {
+  opacity: 0;
+  transform: translateY(-200px) scale(0.2) rotate(-180deg);
+}
+.deal-me-leave-active {
+  position: absolute;
+}
+
+.mini-hand { min-height: 90px; }
+.my-hand { min-height: 150px; }
 
 @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 </style>

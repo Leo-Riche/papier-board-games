@@ -101,6 +101,8 @@ class TimeBomb {
     if (this.state.status !== 'playing') return;
     if (this.state.isRedistributing) return;
 
+    if (Object.keys(this.state.announcements).length < this.state.players.length) return;
+
     const currentShooter = this.state.players.find(p => p.hasScissors);
     if (!currentShooter) return;
 
@@ -202,6 +204,8 @@ class TimeBomb {
   }
 
   broadcastState() {
+    const allAnnounced = Object.keys(this.state.announcements).length === this.state.players.length;
+
     this.state.players.forEach(player => {
       const opponents = this.state.players
         .filter(p => p.id !== player.id)
@@ -223,7 +227,8 @@ class TimeBomb {
         hasScissors: player.hasScissors,
         opponents: opponents,
         isRedistributing: this.state.isRedistributing,
-        protectedPlayerId: this.state.lastShooterId
+        protectedPlayerId: this.state.lastShooterId,
+        allAnnounced: allAnnounced
       });
     });
   }
