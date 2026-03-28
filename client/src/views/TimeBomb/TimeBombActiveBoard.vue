@@ -27,7 +27,6 @@
       >
         <p class="opponent-name">
           👤 {{ p.name || 'Anonyme' }}
-          <span v-if="p.id === protectedPlayerId" class="protected-badge" title="Anti Ping-Pong">🛡️</span>
         </p>
         <div v-if="announcements[p.name]" class="player-announcement">
           {{ announcements[p.name].defuses }} 
