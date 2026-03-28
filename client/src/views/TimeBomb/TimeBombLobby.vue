@@ -3,7 +3,7 @@
     <header class="lobby-header">
       <div class="engraved-panel">
         <h1 class="game-title">TIME BOMB</h1>
-        <p class="subtitle">Enquêtes de Scotland Yard</p>
+        <p class="subtitle">Moriarty VS Sherlock</p>
       </div>
     </header>
 
@@ -15,11 +15,7 @@
             <input type="text" v-model="playerName" placeholder="Votre Pseudo" />
             <div class="blueprint-line"></div>
           </div>
-          <BaseButton variant="primary" @click="createRoom">Initialiser Room 🚀</BaseButton>
-        </div>
-
-        <div class="form-separator">
-          <div class="tb-gear">⚙️</div>
+          <BaseButton variant="primary" @click="createRoom">Initialiser le salon</BaseButton>
         </div>
 
         <div class="setup-form join-form">
@@ -32,7 +28,7 @@
             <input type="text" v-model="roomCode" placeholder="Code (ex: A4X9P)" />
             <div class="blueprint-line"></div>
           </div>
-          <BaseButton variant="secondary" @click="joinRoom">Rejoindre 🚪</BaseButton>
+          <BaseButton variant="secondary" @click="joinRoom">Rejoindre</BaseButton>
         </div>
       </div>
     </main>
@@ -93,21 +89,17 @@ const joinRoom = () => {
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Space+Mono&display=swap');
 
 .lobby-wrapper {
-  height: 100vh; display: flex; flex-direction: column;
-  background: #161514; 
-  color: #dfd3c3; 
-  font-family: 'Space Mono', monospace;
+  min-height: 100vh; display: flex; flex-direction: column;
+  background: #161514; color: #dfd3c3; font-family: 'Space Mono', monospace;
 }
 
 .engraved-panel {
-  text-align: center; padding: 40px 20px;
-  background: transparent;
+  text-align: center; padding: 40px 20px; background: transparent;
   border-bottom: 1px solid rgba(205, 164, 52, 0.3); 
 }
 
 .game-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 3rem; color: #cda434; 
+  font-family: 'Cormorant Garamond', serif; font-size: 3rem; color: #cda434; 
   letter-spacing: 4px; font-weight: normal; margin: 0;
 }
 
@@ -117,28 +109,29 @@ const joinRoom = () => {
 
 .investigation-desk {
   display: flex; align-items: stretch; gap: 60px;
-  background: transparent; padding: 40px;
-  border: 1px solid rgba(205, 164, 52, 0.2);
+  background: transparent; padding: 40px; border: 1px solid rgba(205, 164, 52, 0.2);
 }
 
 .setup-form { display: flex; flex-direction: column; align-items: center; gap: 30px; min-width: 280px;}
 .setup-form h2 { 
-  font-family: 'Cormorant Garamond', serif; 
-  color: #dfd3c3; font-size: 1.5rem; font-weight: normal; 
+  font-family: 'Cormorant Garamond', serif; color: #dfd3c3; font-size: 1.5rem; font-weight: normal; 
   border-bottom: 1px solid #cda434; padding-bottom: 10px; width: 100%; text-align: center;
 }
 
 .tb-input-group { position: relative; width: 100%; }
 .tb-input-group input {
-  width: 100%; padding: 10px 0;
-  background: transparent; border: none; border-bottom: 1px solid rgba(223, 211, 195, 0.3);
+  width: 100%; padding: 10px 0; background: transparent; border: none; border-bottom: 1px solid rgba(223, 211, 195, 0.3);
   color: #dfd3c3; font-family: 'Space Mono', monospace; font-size: 1rem; text-align: center; outline: none; transition: border-color 0.3s;
 }
 .tb-input-group input::placeholder { color: #5a554f; }
 .tb-input-group input:focus { border-bottom-color: #cda434; }
 
-.form-separator { display: flex; align-items: center; justify-content: center; }
-.tb-gear { font-size: 2rem; color: #a96c3c; animation: spin 20s linear infinite; opacity: 0.7; }
-
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .game-title { font-size: 2rem; }
+  .investigation-desk { flex-direction: column; gap: 30px; padding: 20px; width: 100%; max-width: 400px; }
+  .setup-form { min-width: 100%; }
+  .form-separator { transform: rotate(90deg); margin: 10px 0; }
+}
 </style>

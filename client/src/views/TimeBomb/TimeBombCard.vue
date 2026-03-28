@@ -84,4 +84,11 @@ img { max-width: 100%; max-height: 100%; object-fit: contain; }
   transform: translateY(-8px); border-color: #cda434;
 }
 .tb-card-wrapper.can-be-cut:not(.revealed):hover .card-face { border-color: #cda434; }
+
+@media (max-width: 600px) {
+  .tb-card-wrapper { width: 65px; height: 97px; }
+  .image-container { padding: 5px; }
+  .unknown-icon-simple { font-size: 1.5rem; }
+}
+
 </style>

@@ -226,4 +226,11 @@ const handleChatSend = (text) => {
 .revealed-roles li.moriarty { color: #8c3b3b; }
 
 .host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; align-items: center;}
+
+@media (max-width: 768px) {
+  .board-wrapper { padding: 10px; }
+  .results-box { padding: 30px 20px; }
+  .results-box h2 { font-size: 2rem; }
+}
+
 </style>

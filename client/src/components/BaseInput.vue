@@ -37,18 +37,20 @@ defineEmits(['update:modelValue'])
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
+
 .input-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 15px;
+  gap: 5px;
+  margin-bottom: 20px;
   width: 100%;
+  font-family: 'Space Mono', monospace;
 }
 
 .input-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #ffde59;
+  font-size: 0.75rem;
+  color: #8a8277;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -60,20 +62,24 @@ defineEmits(['update:modelValue'])
 
 .base-input {
   width: 100%;
-  padding: 12px 16px;
-  background: #1e1e1e;
-  border: 2px solid #333;
-  border-radius: 8px;
-  color: white;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(223, 211, 195, 0.3);
+  color: #dfd3c3;
+  font-family: 'Space Mono', monospace;
   font-size: 1rem;
-  transition: all 0.3s ease;
+  transition: border-color 0.3s;
   box-sizing: border-box;
+  outline: none;
+}
+
+.base-input::placeholder {
+  color: #5a554f;
 }
 
 .base-input:focus {
-  outline: none;
-  border-color: #ffde59;
-  background: #252525;
+  border-bottom-color: #cda434;
 }
 
 .base-input:disabled {
@@ -81,22 +87,10 @@ defineEmits(['update:modelValue'])
   cursor: not-allowed;
 }
 
-.focus-border {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  width: 0;
-  height: 2px;
-  background-color: #ffde59;
-  transition: 0.4s;
-}
+.focus-border { display: none; }
 
-.base-input:focus + .focus-border {
-  width: 100%;
-  left: 0;
-}
-
-.base-input::placeholder {
-  color: #666;
+@media (max-width: 480px) {
+  .base-input { font-size: 0.9rem; }
+  .input-label { font-size: 0.7rem; }
 }
 </style>

@@ -60,4 +60,10 @@ input:focus { border-bottom-color: #cda434; }
 .join-btn { width: 100%; background: transparent; color: #cda434; border: 1px solid #cda434; font-family: 'Space Mono', monospace; font-size: 0.85rem; padding: 15px; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
 .join-btn:hover:not(:disabled) { background: rgba(205, 164, 52, 0.1); }
 .join-btn:disabled { border-color: #5a554f; color: #5a554f; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .join-box { padding: 30px 20px; }
+  h1 { font-size: 2rem; }
+}
+
 </style>

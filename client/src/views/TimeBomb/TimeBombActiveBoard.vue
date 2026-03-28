@@ -175,15 +175,15 @@ const getRoleCardImageUrl = (roleCardName) => {
 .room-info { font-size: 0.8rem; color: #8a8277; }
 .room-info .engraved { color: #dfd3c3; letter-spacing: 2px;}
 
-.opponents { display: flex; justify-content: space-around; padding: 20px 0; }
+.opponents { display: flex; flex-wrap: wrap; justify-content: space-around; padding: 20px 0; gap: 15px;}
 .player-area { text-align: center; padding: 10px; transition: opacity 0.3s ease; }
 .opponent-name { font-size: 0.85rem; text-transform: uppercase; color: #dfd3c3; margin-bottom: 10px; border-bottom: 1px dashed rgba(223, 211, 195, 0.2); padding-bottom: 5px; display: inline-block;}
-.mini-hand { display: flex; gap: 10px; margin-top: 15px; justify-content: center; }
+.mini-hand { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; justify-content: center; min-height: 120px;}
 
 .player-area.is-protected { opacity: 0.4; pointer-events: none; }
 .protected-badge { font-size: 1rem; margin-left: 5px; opacity: 0.8; }
 
-.central-investigation-bureau { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.central-investigation-bureau { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0;}
 .turn-status-panel { text-align: center; border: 1px solid rgba(205, 164, 52, 0.2); padding: 15px 30px; background: rgba(28, 26, 25, 0.8); }
 .turn-indicator { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;}
 .turn-indicator.my-turn { color: #cda434; animation: pulse 2s infinite; }
@@ -198,6 +198,7 @@ const getRoleCardImageUrl = (roleCardName) => {
 
 .my-info { font-size: 1rem; color: #cda434; text-transform: uppercase; letter-spacing: 2px; }
 
+/* Chat & Rôle gérés en position absolue sur desktop */
 .player-chat-display { position: absolute; bottom: 20px; left: 20px; height: 180px; width: 300px; z-index: 10; }
 .player-role-display { position: absolute; bottom: 20px; right: 20px; height: 180px; z-index: 10; opacity: 0.9; }
 .player-role-display img { height: 100%; border: 1px solid rgba(205, 164, 52, 0.4); }
@@ -206,8 +207,8 @@ const getRoleCardImageUrl = (roleCardName) => {
 
 .announce-panel { border: 1px dashed rgba(205, 164, 52, 0.5); padding: 15px 25px; background: transparent; text-align: center; }
 .announce-title { color: #8a8277; margin-bottom: 15px; font-size: 0.8rem; text-transform: uppercase; }
-.announce-options { display: flex; gap: 20px; align-items: center; justify-content: center; }
-.defuse-btns, .bomb-btn { display: flex; gap: 8px; }
+.announce-options { display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap;}
+.defuse-btns, .bomb-btn { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;}
 .defuse-btns button, .bomb-btn { background: transparent; color: #dfd3c3; border: 1px solid #5a554f; padding: 6px 12px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.8rem; transition: 0.2s; }
 .defuse-btns button:hover, .bomb-btn:hover { border-color: #cda434; }
 .defuse-btns button.active { background: rgba(205, 164, 52, 0.1); border-color: #cda434; color: #cda434; }
@@ -215,20 +216,36 @@ const getRoleCardImageUrl = (roleCardName) => {
 .submit-announce { background: #cda434; color: #161514; border: none; padding: 8px 20px; cursor: pointer; font-family: 'Space Mono', monospace; text-transform: uppercase; font-size: 0.8rem; }
 .submit-announce:hover { background: #dfd3c3; }
 
-.my-announcement { border: 1px solid rgba(205, 164, 52, 0.2); padding: 8px 20px; font-size: 0.85rem; color: #8a8277; }
+.my-announcement { border: 1px solid rgba(205, 164, 52, 0.2); padding: 8px 20px; font-size: 0.85rem; color: #8a8277; text-align: center;}
 .announce-icon { width: 1em; vertical-align: middle; margin-left: 6px; }
 
-.my-hand { display: flex; gap: 20px; margin: 20px 0; }
-.game-active.holding-scissors { cursor: crosshair; }
-.holding-scissors .mini-hand * { cursor: crosshair !important; }
+.my-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 20px 0; min-height: 150px;}
+
+.game-active.holding-scissors { cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, crosshair; }
+.holding-scissors .mini-hand * { cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, pointer !important; }
 .holding-scissors .player-chat-display, .holding-scissors .announce-panel, .holding-scissors button { cursor: default; }
 
 .deal-opponent-enter-active, .deal-opponent-leave-active, .deal-me-enter-active, .deal-me-leave-active { transition: all 0.5s ease; }
 .deal-opponent-enter-from, .deal-me-enter-from { opacity: 0; transform: translateY(20px); }
 .deal-opponent-leave-to, .deal-me-leave-to { opacity: 0; transform: translateY(-20px); }
 .deal-opponent-leave-active, .deal-me-leave-active { position: absolute; }
-.mini-hand { min-height: 120px; }
-.my-hand { min-height: 150px; }
+
+
+@media (max-width: 900px) {
+  .player-role-display { position: relative; bottom: auto; right: auto; height: 120px; order: -1; margin-bottom: 10px; }
+  .player-chat-display { position: relative; bottom: auto; left: auto; width: 100%; max-width: 400px; height: 180px; order: 10; margin-top: 20px; }
+  
+  .game-header { flex-direction: column; align-items: center; gap: 15px; }
+  .blueprints-left { width: 100%; justify-content: space-around; gap: 10px; }
+}
+
+@media (max-width: 600px) {
+  .opponents { flex-direction: column; align-items: center; }
+  .mini-hand { gap: 5px; }
+  .my-hand { gap: 10px; }
+  .turn-status-panel { padding: 10px 15px; }
+  .turn-indicator { font-size: 0.8rem; }
+}
 
 .game-active.holding-scissors {
   cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, crosshair;

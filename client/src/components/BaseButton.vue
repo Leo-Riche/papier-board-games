@@ -13,64 +13,75 @@
 
 <script setup>
 defineProps({
-  variant: { type: String, default: 'secondary' }, // primary, secondary
+  variant: { type: String, default: 'secondary' },
   disabled: { type: Boolean, default: false }
 });
 defineEmits(['click']);
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono&display=swap');
+
 .tb-button {
-  font-family: 'Georgia', serif;
+  font-family: 'Space Mono', monospace;
   text-transform: uppercase;
-  font-weight: bold;
   letter-spacing: 1px;
-  padding: 12px 30px;
+  padding: 12px 25px;
   border: none;
   cursor: pointer;
-  position: relative;
   transition: all 0.2s ease;
   min-width: 150px;
-  box-shadow: 0 4px #4a3121;
-  border-radius: 5px; /* Optionnel : adoucit un peu les angles */
+  font-size: 0.85rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
 }
 
-/* === LA CORRECTION EST ICI === */
-.tb-button .engraving {
-  position: relative; /* Indispensable pour passer au-dessus du ::before */
-  z-index: 1;         /* Passe au premier plan */
-  transition: transform 0.1s ease;
+.tb-button.primary {
+  background: #cda434;
+  color: #161514;
+  border: 1px solid #cda434;
+}
+.tb-button.primary:not(:disabled):hover {
+  background: #dfd3c3;
+  border-color: #dfd3c3;
 }
 
-/* Texture Laiton/Cuivre par défaut en arrière-plan */
-.tb-button::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(145deg, #b87333, #e8a75e);
-  border: 3px solid #8b5a2b;
-  box-shadow: inset 0 2px rgba(255,255,255,0.3);
-  border-radius: 5px; /* Doit correspondre à la bordure du bouton */
-  z-index: 0; /* Reste en fond */
+.tb-button.secondary {
+  color: #cda434;
+  border: 1px solid #cda434;
 }
-
-.tb-button.primary::before {
-  background: linear-gradient(145deg, #daa520, #ffde59);
-  border: 3px solid #a67c00;
+.tb-button.secondary:not(:disabled):hover {
+  background: rgba(205, 164, 52, 0.1);
 }
-
-/* Texte gravé */
-.tb-button { color: #2c3e50; text-shadow: 0 1px rgba(255,255,255,0.2); }
-.tb-button.primary { color: #4a3121; text-shadow: 0 1px rgba(255,255,255,0.4); }
-
-/* Hover effects */
-.tb-button:not(:disabled):hover { transform: translateY(1px); box-shadow: 0 3px #4a3121; }
-.tb-button:not(:disabled):hover::before { filter: brightness(1.1); }
-
-/* Click effect */
-.tb-button:not(:disabled):active { transform: translateY(4px); box-shadow: 0 0px #4a3121; }
 
 .tb-button:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
+  border-color: #5a554f;
+  color: #5a554f;
+}
+
+.tb-button.primary:disabled {
+  background: rgba(90, 85, 79, 0.2);
+  border-color: transparent;
+}
+
+.engraving {
+  position: relative;
+  z-index: 1;
+}
+
+.tb-button::before {
+  display: none; 
+}
+
+@media (max-width: 480px) {
+  .tb-button {
+    width: 100%;
+    padding: 15px 20px;
+    font-size: 0.8rem;
+  }
 }
 </style>

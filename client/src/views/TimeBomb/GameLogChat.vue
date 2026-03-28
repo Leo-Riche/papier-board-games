@@ -86,4 +86,10 @@ watch(() => props.messages, async () => {
   border-left: 1px solid rgba(205, 164, 52, 0.2); cursor: pointer; transition: background 0.2s;
 }
 .chat-input-area button:hover { background: rgba(205, 164, 52, 0.1); }
+
+@media (max-width: 480px) {
+  .game-log-chat { padding: 10px 10px 0 10px; }
+  .chat-input-area { margin: 0 -10px; }
+  .chat-input-area button { padding: 0 15px; }
+}
 </style>
