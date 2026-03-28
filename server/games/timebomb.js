@@ -25,12 +25,14 @@ class TimeBomb {
       status: 'playing',
       isRedistributing: false,
       lastShooterId: null,
+      announcements: {},
       players: []
     };
   }
 
   start() {
     const nbPlayers = this.players.length;
+    this.state.announcements = {};
     
     // 1. Logique des rôles
     let nbSherlock, nbMoriarty;
@@ -135,6 +137,14 @@ class TimeBomb {
     this.broadcastState();
   }
 
+  handleAnnouncement(playerName, defuses, hasBomb) {
+    this.state.announcements[playerName] = { defuses, hasBomb };
+    const bombText = hasBomb ? " et prétend avoir la BOMBE 💥" : "";
+    this.io.to(this.roomCode).emit('action_log', `📣 ${playerName} annonce : ${defuses} câble(s) de désamorçage${bombText}.`);
+    
+    this.broadcastState();
+  }
+
   startNextRound() {
     this.state.round++;
     
@@ -160,6 +170,7 @@ class TimeBomb {
     this.state.turnCuts = 0; 
     this.state.isRedistributing = false;
     this.state.lastShooterId = null;
+    this.state.announcements = {};
 
     const playerWithScissors = this.state.players.find(p => p.hasScissors);
     const scissorsHolderName = playerWithScissors ? playerWithScissors.name : "Quelqu'un";
@@ -198,6 +209,7 @@ class TimeBomb {
         round: this.state.round,
         defusesLeft: this.state.totalDefuses - this.state.defusesFound,
         cutsLeft: this.state.players.length - this.state.turnCuts,
+        announcements: this.state.announcements,
         myRole: player.role,
         myRoleCard: player.roleCard,
         myHand: player.hand,

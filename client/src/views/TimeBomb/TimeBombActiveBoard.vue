@@ -29,6 +29,13 @@
           👤 {{ p.name || 'Anonyme' }}
           <span v-if="p.id === protectedPlayerId" class="protected-badge" title="Anti Ping-Pong">🛡️</span>
         </p>
+        <div v-if="announcements[p.name]" class="player-announcement">
+          {{ announcements[p.name].defuses }} 
+          <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
+          <span v-if="announcements[p.name].hasBomb"> 
+            | <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" />
+          </span>
+        </div>
         <div class="mini-hand">
           <TimeBombCard 
             v-for="(card, i) in p.hand" :key="i" 
@@ -70,6 +77,31 @@
         <img :src="getRoleCardImageUrl(myRoleCard)" alt="Ma Carte Rôle" />
       </div>
 
+      <div v-if="!hasAnnounced" class="announce-panel">
+        <div class="announce-title">Annoncez votre jeu :</div>
+        <div class="announce-options">
+          <div class="defuse-btns">
+            <button 
+              v-for="n in (unrevealedCardsCount + 1)" :key="n-1" 
+              :class="{ active: announceDefuses === (n-1) }"
+              @click="announceDefuses = n-1"
+            >
+              {{ n-1 }} <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
+            </button>
+          </div>
+          <button class="bomb-btn" :class="{ active: announceBomb }" @click="announceBomb = !announceBomb">
+            <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /> Bombe
+          </button>
+          <button class="submit-announce" @click="$emit('announce', { defuses: announceDefuses, hasBomb: announceBomb })">
+            VALIDER
+          </button>
+        </div>
+      </div>
+      <div v-else class="my-announcement">
+        Vous avez annoncé : <strong>{{ announcements[myName].defuses }} <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" /></strong> 
+        <strong v-if="announcements[myName].hasBomb"> et <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /></strong>
+      </div>
+
       <div class="my-hand">
         <TimeBombCard 
           v-for="(card, i) in myHand" :key="i" 
@@ -83,7 +115,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import TimeBombCard from './TimeBombCard.vue'
 import GameLogChat from './GameLogChat.vue' 
 
@@ -92,6 +124,7 @@ const props = defineProps({
   round: Number,
   defusesLeft: Number,
   cutsLeft: Number,
+  announcements: Object,
   myName: String,
   myRole: String, 
   myRoleCard: String,
@@ -103,7 +136,13 @@ const props = defineProps({
   protectedPlayerId: String 
 });
 
-const emit = defineEmits(['cut', 'chatSend']);
+const emit = defineEmits(['cut', 'chatSend', 'announce']);
+
+const announceDefuses = ref(0);
+const announceBomb = ref(false);
+
+const hasAnnounced = computed(() => !!props.announcements[props.myName]);
+const unrevealedCardsCount = computed(() => props.myHand.filter(c => !c.isRevealed).length);
 
 const currentPlayerWithScissors = computed(() => {
   const player = props.otherPlayers.find(p => p.hasScissors);
@@ -133,7 +172,6 @@ const getRoleCardImageUrl = (roleCardName) => {
 .opponent-name { font-weight: bold; margin-bottom: 5px; color: #ffde59; }
 .mini-hand { display: flex; gap: 8px; margin-top: 10px; justify-content: center; }
 
-/* --- Styles pour le joueur protégé (Anti Ping-Pong) --- */
 .player-area.is-protected {
   opacity: 0.6; 
   pointer-events: none; 
@@ -162,6 +200,37 @@ const getRoleCardImageUrl = (roleCardName) => {
 .my-area.sherlock .player-role-display { filter: drop-shadow(0 0 10px #3498db); }
 .my-area.moriarty .player-role-display { filter: drop-shadow(0 0 10px #e74c3c); }
 .my-hand { display: flex; gap: 15px; transform: scale(1.1); margin: 10px 0; }
+
+.player-announcement {
+  background: rgba(0,0,0,0.6); border: 1px solid #3498db; color: #ecf0f1;
+  padding: 4px 8px; border-radius: 12px; font-size: 0.9rem; margin: 5px auto;
+  display: inline-block; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.announce-panel {
+  background: rgba(0,0,0,0.7); border: 2px dashed #ffde59; padding: 10px 20px;
+  border-radius: 8px; margin-bottom: 10px; text-align: center;
+}
+.announce-title { color: #ffde59; margin-bottom: 8px; font-weight: bold; }
+.announce-options { display: flex; gap: 15px; align-items: center; justify-content: center; flex-wrap: wrap;}
+.defuse-btns { display: flex; gap: 5px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;}
+.defuse-btns button, .bomb-btn {
+  background: #2c3e50; color: white; border: 1px solid #7f8c8d; padding: 5px 12px;
+  border-radius: 4px; cursor: pointer; transition: 0.2s; font-weight: bold;
+}
+.defuse-btns button:hover, .bomb-btn:hover { background: #34495e; }
+.defuse-btns button.active { background: #2ecc71; border-color: #27ae60; color: #111; }
+.bomb-btn.active { background: #e74c3c; border-color: #c0392b; color: white; box-shadow: 0 0 10px #e74c3c;}
+.submit-announce { background: #f39c12; color: #111; border: none; font-weight: bold; padding: 6px 15px; border-radius: 4px; cursor: pointer; }
+.submit-announce:hover { background: #f1c40f; }
+.my-announcement { background: rgba(52, 152, 219, 0.2); padding: 8px 15px; border-radius: 5px; border: 1px solid #3498db; margin-bottom: 10px;}
+.announce-icon {
+  width: 1.2em;
+  height: auto;
+  vertical-align: middle;
+  margin-left: 4px;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+}
 
 @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 </style>

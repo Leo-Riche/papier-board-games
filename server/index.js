@@ -94,6 +94,16 @@ io.on('connection', (socket) => {
     game.start();
   });
 
+  socket.on('announce_cards', (data) => {
+    const { roomCode, playerName, defuses, hasBomb } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    
+    if (game) {
+      game.handleAnnouncement(playerName, defuses, hasBomb);
+    }
+  });
+
   socket.on('cut_wire', (data) => {
     const { roomCode, targetId, cardIndex, shooterName } = data;
     const cleanRoomCode = roomCode.trim();

@@ -15,6 +15,7 @@
       :round="round"
       :defusesLeft="defusesLeft"
       :cutsLeft="cutsLeft"
+      :announcements="announcements"
       :myName="myName"
       :myRole="myRole"
       :myRoleCard="myRoleCard"
@@ -25,6 +26,7 @@
       :isRedistributing="isRedistributing"
       :protectedPlayerId="protectedPlayerId"
       @cut="handleCut"
+      @announce="handleAnnounce"
       @chatSend="handleChatSend" 
     />
 
@@ -62,6 +64,7 @@
           :round="round" 
           :defusesLeft="defusesLeft"
           :cutsLeft="cutsLeft"
+          :announcements="announcements"
           :myName="myName" 
           :myRole="myRole"
           :myRoleCard="myRoleCard"
@@ -97,6 +100,7 @@ const amIHost = ref(false)
 const round = ref(1)
 const defusesLeft = ref(0)
 const cutsLeft = ref(0)
+const announcements = ref({})
 const myName = ref('')
 const myRole = ref(null)
 const myRoleCard = ref('')
@@ -105,7 +109,7 @@ const hasScissors = ref(false)
 const otherPlayers = ref([])
 const gameMessages = ref([])
 const isRedistributing = ref(false)
-const protectedPlayerId = ref(null) // 👈 La variable est bien là
+const protectedPlayerId = ref(null)
 
 const winner = ref('')
 const winReason = ref('')
@@ -143,13 +147,14 @@ onMounted(() => {
     round.value = data.round;
     defusesLeft.value = data.defusesLeft;
     cutsLeft.value = data.cutsLeft;
+    announcements.value = data.announcements || {};
     myRole.value = data.myRole;
     myRoleCard.value = data.myRoleCard;
     myHand.value = data.myHand;
     hasScissors.value = data.hasScissors;
     otherPlayers.value = data.opponents;
     isRedistributing.value = data.isRedistributing;
-    protectedPlayerId.value = data.protectedPlayerId; // 👈 Elle est bien mise à jour !
+    protectedPlayerId.value = data.protectedPlayerId;
   });
 
   socket.on('action_log', (msg) => { 
@@ -170,6 +175,10 @@ onMounted(() => {
 });
 
 const startGame = () => socket.emit('start_timebomb', roomCode);
+
+const handleAnnounce = ({ defuses, hasBomb }) => {
+  socket.emit('announce_cards', { roomCode, playerName: myName.value, defuses, hasBomb });
+}
 
 const handleCut = ({ targetId, cardIndex }) => {
   if (!hasScissors.value) return alert("Ce n'est pas ton tour !");
