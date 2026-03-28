@@ -69,37 +69,32 @@ defineEmits(['start']);
 </script>
 
 <style scoped>
-.lobby-waiting { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center; }
+.lobby-waiting { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; text-align: center; font-family: 'Space Mono', monospace; }
 
-h2 { font-size: 2.5rem; color: #daa520; text-shadow: 0 2px black; font-family: serif;}
+h2 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: #cda434; font-weight: normal; letter-spacing: 2px; margin: 0;}
 
 .players-list-container {
-  background: #0a1020;
-  border: 5px solid #a67c00; padding: 30px; border-radius: 10px;
-  min-width: 350px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  background: #1c1a19; border: 1px solid rgba(205, 164, 52, 0.3);
+  padding: 30px 40px; min-width: 350px;
 }
 
-.players-list-container h3 { color: white; border-bottom: 2px solid rgba(255,222,89,0.3); padding-bottom: 10px;}
+.players-list-container h3 { color: #8a8277; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; font-weight: normal; }
 
-.players-list { list-style: none; padding: 0; margin-top: 15px; }
+.players-list { list-style: none; padding: 0; margin: 0; }
 .players-list li {
-  padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
-  font-size: 1.2rem; color: #bdc3c7; display: flex; align-items: center; justify-content: center;
+  padding: 10px 0; border-bottom: 1px dashed rgba(223, 211, 195, 0.1);
+  font-size: 1rem; color: #dfd3c3; text-align: left;
 }
-.players-list li .badge { margin-right: 10px; opacity: 0.7;}
+.players-list li:last-child { border-bottom: none; }
 
-.is-me {
-  background: rgba(255,222,89,0.1);
-  color: #ffde59; font-weight: bold; border-radius: 5px;
-}
+.is-me { color: #cda434 !important; font-weight: bold; }
 
-.info-msg { font-size: 1rem; color: #ffcc00; font-style: italic; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;}
+.info-msg { font-size: 0.85rem; color: #a96c3c; border: 1px solid rgba(169, 108, 60, 0.3); padding: 10px 20px; background: rgba(169, 108, 60, 0.05); }
 
 .share-btn {
-  background: #3498db; color: white; border: none; padding: 8px 15px;
-  border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px;
-  transition: background 0.2s;
+  background: transparent; color: #dfd3c3; border: 1px solid #5a554f;
+  padding: 8px 15px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.8rem;
+  transition: all 0.2s; text-transform: uppercase;
 }
-.share-btn:hover { background: #2980b9; }
-
+.share-btn:hover { border-color: #cda434; color: #cda434; }
 </style>

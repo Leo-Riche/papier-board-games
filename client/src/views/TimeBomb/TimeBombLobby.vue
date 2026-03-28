@@ -90,49 +90,55 @@ const joinRoom = () => {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Space+Mono&display=swap');
+
 .lobby-wrapper {
   height: 100vh; display: flex; flex-direction: column;
-  background: #2c3e50;
-  color: #4a3121;
+  background: #161514; 
+  color: #dfd3c3; 
+  font-family: 'Space Mono', monospace;
 }
 
 .engraved-panel {
-  text-align: center; padding: 30px;
-  background: linear-gradient(135deg, #1f4068, #0a1020); /* Bleu Sherlock */
-  border-bottom: 5px solid #a67c00;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+  text-align: center; padding: 40px 20px;
+  background: transparent;
+  border-bottom: 1px solid rgba(205, 164, 52, 0.3); 
 }
 
 .game-title {
-  font-family: 'Times New Roman', serif;
-  font-size: 3.5rem; color: #ffde59; text-shadow: 0 2px 0 #8b5a2b; margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 3rem; color: #cda434; 
+  letter-spacing: 4px; font-weight: normal; margin: 0;
 }
 
-.subtitle { color: #bdc3c7; font-style: italic; margin-top: 5px; }
+.subtitle { color: #8a8277; font-size: 0.9rem; letter-spacing: 2px; text-transform: uppercase; margin-top: 10px; }
 
 .lobby-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
 
 .investigation-desk {
-  display: flex; align-items: stretch; gap: 40px;
-  background: rgba(255,255,255,0.05); padding: 50px;
-  border-radius: 10px; border: 3px solid rgba(74,49,33,0.3);
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+  display: flex; align-items: stretch; gap: 60px;
+  background: transparent; padding: 40px;
+  border: 1px solid rgba(205, 164, 52, 0.2);
 }
 
-.setup-form { display: flex; flex-direction: column; align-items: center; gap: 20px; min-width: 300px;}
-.setup-form h2 { color: #8b1a10; font-family: serif; border-bottom: 2px solid #a67c00;}
+.setup-form { display: flex; flex-direction: column; align-items: center; gap: 30px; min-width: 280px;}
+.setup-form h2 { 
+  font-family: 'Cormorant Garamond', serif; 
+  color: #dfd3c3; font-size: 1.5rem; font-weight: normal; 
+  border-bottom: 1px solid #cda434; padding-bottom: 10px; width: 100%; text-align: center;
+}
 
 .tb-input-group { position: relative; width: 100%; }
 .tb-input-group input {
-  width: 100%; padding: 12px 15px;
-  background: #f1e7d0; /* Papier jauni */
-  border: 2px solid #8b5a2b; color: black; font-weight: bold; font-size: 1.1rem;
+  width: 100%; padding: 10px 0;
+  background: transparent; border: none; border-bottom: 1px solid rgba(223, 211, 195, 0.3);
+  color: #dfd3c3; font-family: 'Space Mono', monospace; font-size: 1rem; text-align: center; outline: none; transition: border-color 0.3s;
 }
-.blueprint-line { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #daa520; transform: scaleX(0); transition: transform 0.3s ease; }
-.tb-input-group input:focus + .blueprint-line { transform: scaleX(1); }
+.tb-input-group input::placeholder { color: #5a554f; }
+.tb-input-group input:focus { border-bottom-color: #cda434; }
 
 .form-separator { display: flex; align-items: center; justify-content: center; }
-.tb-gear { font-size: 3rem; color: #8b5a2b; animation: spin 10s linear infinite; opacity: 0.5; }
+.tb-gear { font-size: 2rem; color: #a96c3c; animation: spin 20s linear infinite; opacity: 0.7; }
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 </style>

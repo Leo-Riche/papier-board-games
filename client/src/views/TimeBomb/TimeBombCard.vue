@@ -48,92 +48,40 @@ const onCut = () => {
 </script>
 
 <style scoped>
-/* ========================================================== */
-/* STYLES DE BASE & STRUCTURE (Indispensables) */
-/* ========================================================== */
 .tb-card-wrapper {
-  position: relative; /* Indispensable pour garder les faces à l'intérieur ! */
-  width: 100px;
-  height: 150px;
-  perspective: 1000px; /* Nécessaire pour l'animation de flip */
-  transform-style: preserve-3d;
-  cursor: default;
-  transition: transform 0.2s ease; /* Animation d'échelle au survol */
+  position: relative; width: 90px; height: 135px;
+  perspective: 1000px; transform-style: preserve-3d; cursor: default;
+  transition: transform 0.3s ease;
 }
 
 .card-face {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  backface-visibility: hidden; /* Cache le dos pendant le flip */
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* Animation de flip */
-  border-radius: 4px; /* Un léger arrondi pour adoucir */
-  overflow: hidden;
-  background-color: transparent; /* Supprime les dégradés et couleurs */
-  border: none;
-  box-shadow: none;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  backface-visibility: hidden; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(205, 164, 52, 0.4); background: #262321;
 }
 
-/* Conteneur d'image centré */
 .image-container {
-  width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-  position: relative; /* C'est ce qui permet à l'image d'être en dessous de l'overlay */
-  z-index: 1; /* Reste en dessous */
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  position: relative; z-index: 1; padding: 10px; box-sizing: border-box;
 }
 
-img {
-  max-width: 100%; max-height: 100%;
-  object-fit: contain; /* S'assure que l'image ne dépasse pas */
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); /* Ombre portée douce sur l'image */
-}
+img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
-/* Visuel de la carte cachée d'adversaire (simplifié) */
-.unknown-icon-simple {
-  color: #bdc3c7; font-family: serif; font-size: 2.5rem; font-weight: bold;
-}
+.unknown-icon-simple { color: #5a554f; font-family: 'Space Mono', monospace; font-size: 2rem; font-weight: normal; }
 
-/* ========================================================== */
-/* NOUVEAU : STYLES POUR L'OVERLAY "was-cut" (Demandé) */
-/* ========================================================== */
-
-/* Le conteneur d'overlay prend toute la place de la carte */
 .cut-indicator-overlay {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  z-index: 10;
-  pointer-events: none;
-  border-radius: 4px;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+  pointer-events: none; border: 1px solid #a96c3c; background: rgba(169, 108, 60, 0.1);
 }
 
-/* L'icône de ciseaux gravée dans le coin supérieur droit */
-.cut-scissors {
-  position: absolute;
-  top: 5px; right: 5px;
-  font-size: 1.5rem;
-  color: white;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8)); /* Ombre portée pour le détacher de l'image */
-}
-
-/* ========================================================== */
-/* ANIMATIONS & INTERACTIONS */
-/* ========================================================== */
-
-/* === Animation de Retournement (Flip) === */
 .card-back { transform: rotateY(0deg); }
-.card-front { transform: rotateY(180deg); } /* Cachée par défaut */
-
-/* Triggers du flip */
+.card-front { transform: rotateY(180deg); }
 .revealed .card-back { transform: rotateY(-180deg); }
 .revealed .card-front { transform: rotateY(0deg); }
 
-/* === Interaction de Survol (Highlight) === */
-/* L’effet de survol quand c’est à votre de tour de couper */
-.tb-card-wrapper.can-be-cut:not(.revealed) {
-  cursor: crosshair;
-}
-
+.tb-card-wrapper.can-be-cut:not(.revealed) { cursor: crosshair; }
 .tb-card-wrapper.can-be-cut:not(.revealed):hover {
-  transform: scale(1.05) translateY(-5px); /* Animation d'échelle simple */
-  filter: brightness(1.2) contrast(1.1); /* Éclaircissement au survol */
+  transform: translateY(-8px); border-color: #cda434;
 }
+.tb-card-wrapper.can-be-cut:not(.revealed):hover .card-face { border-color: #cda434; }
 </style>

@@ -52,59 +52,38 @@ watch(() => props.messages, async () => {
 
 <style scoped>
 .game-log-chat {
-  width: 100%; height: 100%;
-  display: flex; flex-direction: column;
-  background: #f1e7d0; 
-  border: 3px solid #111; 
-  border-radius: 4px; 
-  box-shadow: 0 5px 15px rgba(0,0,0,0.5); 
-  padding: 10px 10px 0 10px; 
-  overflow: hidden;
+  width: 100%; height: 100%; display: flex; flex-direction: column;
+  background: #1c1a19; border: 1px solid rgba(205, 164, 52, 0.3);
+  padding: 15px 15px 0 15px; overflow: hidden; font-family: 'Space Mono', monospace;
 }
 
 .messages-history {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 5px;
-  margin-bottom: 10px;
-  display: flex; flex-direction: column;
-  gap: 4px; /* Petit espace entre chaque ligne */
+  flex: 1; overflow-y: auto; padding-right: 10px; margin-bottom: 15px;
+  display: flex; flex-direction: column; gap: 8px;
 }
-.messages-history::-webkit-scrollbar { width: 6px; }
-.messages-history::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
-.messages-history::-webkit-scrollbar-thumb { background: #8b5a2b; border-radius: 3px; }
+.messages-history::-webkit-scrollbar { width: 4px; }
+.messages-history::-webkit-scrollbar-track { background: transparent; }
+.messages-history::-webkit-scrollbar-thumb { background: rgba(205, 164, 52, 0.3); }
 
-/* --- Style d'une ligne de tchat simple --- */
-.chat-line {
-  font-size: 0.95rem;
-  color: #111;
-  line-height: 1.3;
-  word-wrap: break-word;
-}
+.chat-line { font-size: 0.8rem; line-height: 1.4; color: #dfd3c3; }
 
-.sender-name {
-  font-weight: bold;
-  color: #1f4068; /* Bleu profond pour les pseudos */
-}
+.sender-name { font-weight: bold; color: #cda434; text-transform: uppercase; }
 
-/* On change juste la couleur du pseudo pour les messages du jeu */
-.chat-line.system .sender-name {
-  color: #8b5a2b; /* Marron doré pour le Système */
-}
-.chat-line.system .text-body {
-  font-style: italic;
-  color: #333;
-}
+.chat-line.system .sender-name { color: #a96c3c; }
+.chat-line.system .text-body { color: #8a8277; font-style: italic; }
 
-/* --- Zone d'envoi --- */
 .chat-input-area {
-  display: flex; background: white; margin: 0 -10px; border-top: 1px solid #ccc;
+  display: flex; background: #161514; margin: 0 -15px; border-top: 1px solid rgba(205, 164, 52, 0.2);
 }
 .chat-input-area input {
-  flex: 1; padding: 10px 12px; background: white; border: none; color: black; font-size: 0.95rem; outline: none;
+  flex: 1; padding: 12px 15px; background: transparent; border: none;
+  color: #dfd3c3; font-family: 'Space Mono', monospace; font-size: 0.8rem; outline: none;
 }
+.chat-input-area input::placeholder { color: #5a554f; }
 .chat-input-area button {
-  background: #daa520; color: #111; font-family: sans-serif; text-transform: uppercase; font-weight: bold; font-size: 0.8rem; padding: 0 15px; border: none; cursor: pointer; transition: background 0.2s; border-left: 1px solid #ccc;
+  background: transparent; color: #cda434; font-family: 'Space Mono', monospace;
+  text-transform: uppercase; font-size: 0.75rem; padding: 0 20px; border: none;
+  border-left: 1px solid rgba(205, 164, 52, 0.2); cursor: pointer; transition: background 0.2s;
 }
-.chat-input-area button:hover { background: #ffde59; }
+.chat-input-area button:hover { background: rgba(205, 164, 52, 0.1); }
 </style>

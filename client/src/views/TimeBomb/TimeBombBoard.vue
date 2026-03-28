@@ -204,22 +204,26 @@ const handleChatSend = (text) => {
 </script>
 
 <style scoped>
-.board-wrapper { height: 100vh; display: flex; flex-direction: column; background: #2c3e50; color: white; padding: 20px; }
+.board-wrapper { height: 100vh; display: flex; flex-direction: column; background: #161514; color: #dfd3c3; padding: 20px; font-family: 'Space Mono', monospace; }
 .game-over-screen { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; }
-.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.3; pointer-events: none; z-index: 1; }
-.results-box { background: rgba(20, 20, 20, 0.95); padding: 40px; border-radius: 20px; text-align: center; z-index: 10; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 2px solid #ffde59; max-width: 600px; width: 100%;}
-.results-box h2 { font-size: 2.5rem; margin-bottom: 10px; }
-.results-box h3 { font-size: 2rem; margin-bottom: 20px; text-transform: uppercase; }
-.results-box h3.sherlock { color: #3498db; }
-.results-box h3.moriarty { color: #e74c3c; }
-.reason { font-size: 1.2rem; margin-bottom: 20px; font-style: italic; }
+.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.15; pointer-events: none; z-index: 1; }
 
-.revealed-roles { margin: 25px 0; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; }
-.revealed-roles h4 { margin-bottom: 15px; color: #ffde59; font-size: 1.2rem; letter-spacing: 1px; }
-.revealed-roles ul { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.revealed-roles li { padding: 8px 15px; border-radius: 20px; font-size: 1.1rem; border: 2px solid transparent;}
-.revealed-roles li.sherlock { background: rgba(52, 152, 219, 0.15); border-color: #3498db; color: #3498db; }
-.revealed-roles li.moriarty { background: rgba(231, 76, 60, 0.15); border-color: #e74c3c; color: #e74c3c; }
+.results-box { 
+  background: #1c1a19; padding: 50px; text-align: center; z-index: 10; 
+  border: 1px solid #cda434; max-width: 600px; width: 100%;
+}
+.results-box h2 { font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; margin-bottom: 10px; font-weight: normal; color: #dfd3c3; }
+.results-box h3 { font-size: 1.2rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+.results-box h3.sherlock { color: #4b6b78; }
+.results-box h3.moriarty { color: #8c3b3b; }
+.reason { font-size: 0.9rem; margin-bottom: 30px; color: #8a8277; }
 
-.host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; align-items: center;}
+.revealed-roles { margin: 30px 0; border-top: 1px dashed rgba(205, 164, 52, 0.3); border-bottom: 1px dashed rgba(205, 164, 52, 0.3); padding: 25px 0; }
+.revealed-roles h4 { margin-bottom: 20px; color: #8a8277; font-size: 0.8rem; text-transform: uppercase; font-weight: normal;}
+.revealed-roles ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.revealed-roles li { font-size: 0.9rem; }
+.revealed-roles li.sherlock { color: #4b6b78; }
+.revealed-roles li.moriarty { color: #8c3b3b; }
+
+.host-actions { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; align-items: center;}
 </style>
