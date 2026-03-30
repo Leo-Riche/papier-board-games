@@ -9,6 +9,13 @@
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
+      <div class="game-card" @click="$router.push('/loupgarou/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Loup Garou 🐺</h2>
+        <p>Participez à une partie de Loup-Garou et tentez de découvrir les rôles des autres joueurs !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
+
       <div class="game-card disabled">
         <h2>Prochainement...</h2>
         <p>Un nouveau jeu arrive bientôt dans la bibliothèque.</p>

@@ -2,8 +2,8 @@
   <div class="lobby-wrapper">
     <header class="lobby-header">
       <div class="engraved-panel">
-        <h1 class="game-title">TIME BOMB</h1>
-        <p class="subtitle">Moriarty VS Sherlock</p>
+        <h1 class="game-title">Loup Garou</h1>
+        <p class="subtitle">Le village s'endort</p>
       </div>
     </header>
 
@@ -38,14 +38,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { io } from 'socket.io-client'
 import BaseInput from '@/components/BaseInput.vue'
 import BaseButton from '@/components/BaseButton.vue'
 
 const router = useRouter()
-
-const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const socket = io(socketUrl)
 
 const playerName = ref('')
 const roomCode = ref('')
@@ -61,27 +57,18 @@ const generateRoomCode = (length = 5) => {
 
 const createRoom = () => {
   if (!playerName.value) return alert("Choisis un pseudo !")
-  
   const newCode = generateRoomCode();
-
-  localStorage.setItem('temp_player_name', playerName.value);
   
-  socket.emit('set_player_name', { 
-    name: playerName.value, 
-    roomCode: newCode 
-  })
-
-  router.push(`/timebomb/${newCode}`)
+  localStorage.setItem('temp_player_name', playerName.value);
+  router.push(`/loupgarou/game/${newCode}`)
 }
 
 const joinRoom = () => {
   if (!playerName.value || !roomCode.value) {
     return alert("Pseudo et Code requis !")
   }
-
   localStorage.setItem('temp_player_name', playerName.value);
-  socket.emit('set_player_name', { name: playerName.value, roomCode: roomCode.value });
-  router.push(`/timebomb/${roomCode.value}`)
+  router.push(`/loupgarou/game/${roomCode.value.toUpperCase()}`)
 }
 </script>
 

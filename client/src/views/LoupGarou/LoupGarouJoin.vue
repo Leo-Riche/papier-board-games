@@ -1,7 +1,7 @@
 <template>
   <div class="join-wrapper">
     <div class="join-box">
-      <h1>💣 Time Bomb</h1>
+      <h1>🐺 Loup Garou</h1>
       <p>Tu as été invité(e) à rejoindre la salle <strong>{{ roomCode }}</strong> !</p>
       
       <div class="input-group">
@@ -9,7 +9,7 @@
         <input 
           type="text" 
           v-model="pseudo" 
-          placeholder="Ex: Sherlock99" 
+          placeholder="Ex: Fais le loup très méchant" 
           @keyup.enter="joinGame"
           autofocus
         />
@@ -35,7 +35,7 @@ const pseudo = ref('')
 const joinGame = () => {
   if (!pseudo.value.trim()) return;
   localStorage.setItem('temp_player_name', pseudo.value.trim());
-  router.push(`/timebomb/${roomCode}`); 
+  router.push(`/loupgarou/game/${roomCode}`); 
 }
 </script>
 

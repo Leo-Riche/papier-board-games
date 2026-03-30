@@ -43,10 +43,10 @@ import { ref } from 'vue';
 const copyButtonText = ref('🔗 Copier le lien d\'invitation')
 
 const copyJoinLink = async () => {
-  const joinUrl = `${window.location.origin}/timebomb/join/${props.roomCode}`
+  const joinUrl = `${window.location.origin}/loupgarou/join/${props.roomCode}`
   
   try {
-    await navigator.clipboard.writeText(joinUrl)  
+    await navigator.clipboard.writeText(joinUrl)
     copyButtonText.value = '✅ Lien copié !'
     
     setTimeout(() => {
