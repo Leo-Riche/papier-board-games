@@ -10,13 +10,13 @@
           <label>Fils restants</label>
           <div class="value">{{ defusesLeft }}</div>
         </div>
-        <div class="stat-box cuts-left">
-          <label>Coups restants</label>
-          <div class="value">{{ cutsLeft }}</div>
-        </div>
         <div v-if="allAnnounced" class="stat-box announced">
           <label>Fils annoncés</label>
           <div class="value">{{ totalAnnouncedDefuses }}</div>
+        </div>
+        <div class="stat-box cuts-left">
+          <label>Coups restants</label>
+          <div class="value">{{ cutsLeft }}</div>
         </div>
       </div>
       <div class="room-info">Code: <span class="engraved">{{ roomCode }}</span></div>
