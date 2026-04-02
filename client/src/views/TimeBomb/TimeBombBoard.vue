@@ -32,7 +32,8 @@
     />
 
     <div v-else-if="gameStatus === 'finished'" class="game-over-screen">
-      <div class="results-box">
+      <div v-if="showResultsPopup" class="results-box">
+        <button class="close-popup-btn" @click="showResultsPopup = false">&times;</button>
         <h2>Partie Terminée !</h2>
         <h3 :class="winner.toLowerCase()">Victoire de l'équipe {{ winner }} 🏆</h3>
         <p class="reason">{{ winReason }}</p>
@@ -59,7 +60,11 @@
         </div>
       </div>
 
-      <div class="board-background">
+      <button v-if="!showResultsPopup" class="reopen-popup-btn" @click="showResultsPopup = true">
+        🏆 Résultats
+      </button>
+
+      <div class="board-background" :class="{ dimmed: showResultsPopup }">
         <TimeBombActiveBoard 
           :roomCode="roomCode" 
           :round="round" 
@@ -115,6 +120,8 @@ const isRedistributing = ref(false)
 const protectedPlayerId = ref(null)
 const allAnnounced = ref(false)
 
+const showResultsPopup = ref(true)
+
 const winner = ref('')
 const winReason = ref('')
 const finalPlayers = ref([]) 
@@ -151,6 +158,7 @@ onMounted(() => {
     isRedistributing.value = false;
     protectedPlayerId.value = null;
     finalPlayers.value = [];
+    showResultsPopup.value = true;
   });
 
   socket.on('update_board_state', (data) => {
@@ -206,12 +214,36 @@ const handleChatSend = (text) => {
 <style scoped>
 .board-wrapper { height: 100vh; display: flex; flex-direction: column; background: #161514; color: #dfd3c3; padding: 20px; font-family: 'Space Mono', monospace; }
 .game-over-screen { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; }
-.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.15; pointer-events: none; z-index: 1; }
+.board-background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 1; transition: opacity 0.3s ease; opacity: 1; }
+.board-background.dimmed { opacity: 0.15; }
 
 .results-box { 
   background: #1c1a19; padding: 50px; text-align: center; z-index: 10; 
   border: 1px solid #cda434; max-width: 600px; width: 100%;
+  position: relative;
+  animation: fadeIn 0.3s ease;
 }
+
+.close-popup-btn {
+  position: absolute; top: 10px; right: 15px;
+  background: none; border: none; color: #8a8277; font-size: 1.6rem;
+  cursor: pointer; font-family: 'Space Mono', monospace;
+  transition: color 0.2s;
+}
+.close-popup-btn:hover { color: #dfd3c3; }
+
+.reopen-popup-btn {
+  position: fixed; bottom: 25px; right: 25px; z-index: 100;
+  background: #cda434; color: #161514; border: none;
+  padding: 12px 22px; font-family: 'Space Mono', monospace;
+  font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; box-shadow: 0 4px 15px rgba(205, 164, 52, 0.3);
+  transition: background 0.2s, transform 0.2s;
+  animation: fadeIn 0.3s ease;
+}
+.reopen-popup-btn:hover { background: #dfd3c3; transform: translateY(-2px); }
+
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 .results-box h2 { font-family: 'Cormorant Garamond', serif; font-size: 2.5rem; margin-bottom: 10px; font-weight: normal; color: #dfd3c3; }
 .results-box h3 { font-size: 1.2rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
 .results-box h3.sherlock { color: #4b6b78; }

@@ -14,6 +14,10 @@
           <label>Coups restants</label>
           <div class="value">{{ cutsLeft }}</div>
         </div>
+        <div v-if="allAnnounced" class="stat-box announced">
+          <label>Fils annoncés</label>
+          <div class="value">{{ totalAnnouncedDefuses }}</div>
+        </div>
       </div>
       <div class="room-info">Code: <span class="engraved">{{ roomCode }}</span></div>
     </div>
@@ -28,7 +32,7 @@
         <p class="opponent-name">
           👤 {{ p.name || 'Anonyme' }}
         </p>
-        <div v-if="announcements[p.name]" class="player-announcement">
+        <div v-if="allAnnounced && announcements[p.name]" class="player-announcement">
           {{ announcements[p.name].defuses }} 
           <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
           <span v-if="announcements[p.name].hasBomb"> 
@@ -100,6 +104,9 @@
           </button>
         </div>
       </div>
+      <div v-else-if="!allAnnounced" class="my-announcement">
+        Annonce envoyée. En attente des autres joueurs...
+      </div>
       <div v-else class="my-announcement">
         Vous avez annoncé : <strong>{{ announcements[myName].defuses }} <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" /></strong> 
         <strong v-if="announcements[myName].hasBomb"> et <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /></strong>
@@ -148,6 +155,13 @@ const announceBomb = ref(false);
 
 const hasAnnounced = computed(() => !!props.announcements[props.myName]);
 const unrevealedCardsCount = computed(() => props.myHand.filter(c => !c.isRevealed).length);
+
+const totalAnnouncedDefuses = computed(() => {
+  return Object.values(props.announcements).reduce((sum, a) => sum + a.defuses, 0);
+});
+const totalAnnouncedBombs = computed(() => {
+  return Object.values(props.announcements).filter(a => a.hasBomb).length;
+});
 
 const currentPlayerWithScissors = computed(() => {
   const player = props.otherPlayers.find(p => p.hasScissors);
@@ -217,6 +231,9 @@ const getRoleCardImageUrl = (roleCardName) => {
 
 .my-announcement { border: 1px solid rgba(205, 164, 52, 0.2); padding: 8px 20px; font-size: 0.85rem; color: #8a8277; text-align: center;}
 .announce-icon { width: 1em; vertical-align: middle; margin-left: 6px; }
+
+.stat-icon { width: 0.9em; margin-left: 2px; }
+.stat-box.announced .value { display: flex; align-items: center; gap: 2px; }
 
 .my-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 20px 0; min-height: 150px;}
 

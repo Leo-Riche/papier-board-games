@@ -148,8 +148,15 @@ class TimeBomb {
 
   handleAnnouncement(playerName, defuses, hasBomb) {
     this.state.announcements[playerName] = { defuses, hasBomb };
-    const bombText = hasBomb ? " et prétend avoir la BOMBE 💥" : "";
-    this.io.to(this.roomCode).emit('action_log', `📣 ${playerName} annonce : ${defuses} câble(s) de désamorçage${bombText}.`);
+    
+    const allAnnounced = Object.keys(this.state.announcements).length === this.state.players.length;
+    
+    if (allAnnounced) {
+      for (const [name, ann] of Object.entries(this.state.announcements)) {
+        const bombText = ann.hasBomb ? " et prétend avoir la BOMBE 💥" : "";
+        this.io.to(this.roomCode).emit('action_log', `📣 ${name} annonce : ${ann.defuses} câble(s) de désamorçage${bombText}.`);
+      }
+    }
     
     this.broadcastState();
   }
