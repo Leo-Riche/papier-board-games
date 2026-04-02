@@ -172,7 +172,7 @@ const getPlayerName = (id) => {
 
 const myRoleImageUrl = computed(() => {
   if (!props.myRole) return '';
-  return new URL(`../../assets/images/roles/${props.myRole}.svg`, import.meta.url).href;
+  return new URL(`../../assets/images/TimeBomb/roles/${props.myRole}.svg`, import.meta.url).href;
 });
 </script>
 

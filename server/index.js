@@ -4,6 +4,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const TimeBomb = require('./games/timebomb');
+const LoupGarou = require('./games/loupgarou');
 
 const app = express();
 app.use(cors());
@@ -118,6 +119,45 @@ io.on('connection', (socket) => {
     if (game) {
       game.handleCut(targetId, cardIndex, shooterName);
     }
+  });
+
+  socket.on('start_loupgarou', (data) => {
+    const { roomCode, roleComposition } = typeof data === 'string' 
+      ? { roomCode: data, roleComposition: null } 
+      : data;
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+    
+    const playersData = clients.map(id => {
+        const s = io.sockets.sockets.get(id);
+        return { id: id, name: s.playerName || "Anonyme" };
+    });
+
+    const game = new LoupGarou(cleanRoomCode, playersData, io, roleComposition);
+    activeGames[cleanRoomCode] = game;
+    
+    io.to(cleanRoomCode).emit('game_started');
+    game.start();
+  });
+
+  socket.on('loupgarou_action', (data) => {
+    const { roomCode, actionType, targetId } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof LoupGarou) {
+      game.handleAction(socket.id, actionType, targetId);
+    }
+  });
+
+  socket.on('update_role_composition', (data) => {
+    const { roomCode, roleComposition } = data;
+    const cleanRoomCode = roomCode.trim();
+    // Broadcast la composition à tous les joueurs de la room (sauf l'émetteur)
+    socket.to(cleanRoomCode).emit('role_composition_updated', roleComposition);
   });
 
   socket.on('send_player_chat', (data) => {

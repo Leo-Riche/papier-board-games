@@ -34,9 +34,9 @@
         </p>
         <div v-if="allAnnounced && announcements[p.name]" class="player-announcement">
           {{ announcements[p.name].defuses }} 
-          <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
+          <img src="@/assets/images/TimeBomb/Cartes/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
           <span v-if="announcements[p.name].hasBomb"> 
-            | <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" />
+            | <img src="@/assets/images/TimeBomb/Cartes/Bombe.svg" alt="Bombe" class="announce-icon" />
           </span>
         </div>
         <TransitionGroup name="deal-opponent" tag="div" class="mini-hand">
@@ -61,12 +61,12 @@
           ⏳ En attente des annonces ({{ Object.keys(announcements).length }} / {{ otherPlayers.length + 1 }})...
         </div>
         <div v-else-if="hasScissors" class="turn-indicator my-turn">
-          <img src="@/assets/images/Ciseaux.svg" alt="Ciseaux" class="ui-scissors-icon" /> 
+          <img src="@/assets/images/TimeBomb/Cartes/Ciseaux.svg" alt="Ciseaux" class="ui-scissors-icon" /> 
           A VOUS de couper !
         </div>
         <div v-else class="turn-indicator other-turn">
           C'est au tour de <strong>{{ currentPlayerWithScissors }}</strong> 
-          <img src="@/assets/images/Ciseaux.svg" alt="Ciseaux" class="ui-scissors-icon" />
+          <img src="@/assets/images/TimeBomb/Cartes/Ciseaux.svg" alt="Ciseaux" class="ui-scissors-icon" />
         </div>
       </div>
     </div>
@@ -93,11 +93,11 @@
               :class="{ active: announceDefuses === (n-1) }"
               @click="announceDefuses = n-1"
             >
-              {{ n-1 }} <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
+              {{ n-1 }} <img src="@/assets/images/TimeBomb/Cartes/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" />
             </button>
           </div>
           <button class="bomb-btn" :class="{ active: announceBomb }" @click="announceBomb = !announceBomb">
-            <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /> Bombe
+            <img src="@/assets/images/TimeBomb/Cartes/Bombe.svg" alt="Bombe" class="announce-icon" /> Bombe
           </button>
           <button class="submit-announce" @click="$emit('announce', { defuses: announceDefuses, hasBomb: announceBomb })">
             VALIDER
@@ -108,8 +108,8 @@
         Annonce envoyée. En attente des autres joueurs...
       </div>
       <div v-else class="my-announcement">
-        Vous avez annoncé : <strong>{{ announcements[myName].defuses }} <img src="@/assets/images/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" /></strong> 
-        <strong v-if="announcements[myName].hasBomb"> et <img src="@/assets/images/Bombe.svg" alt="Bombe" class="announce-icon" /></strong>
+        Vous avez annoncé : <strong>{{ announcements[myName].defuses }} <img src="@/assets/images/TimeBomb/Cartes/Desamorceur.svg" alt="Désamorceurs" class="announce-icon" /></strong> 
+        <strong v-if="announcements[myName].hasBomb"> et <img src="@/assets/images/TimeBomb/Cartes/Bombe.svg" alt="Bombe" class="announce-icon" /></strong>
       </div>
 
       <TransitionGroup name="deal-me" tag="div" class="my-hand">
@@ -173,8 +173,8 @@ const handleChatSend = (text) => {
 }
 
 const getRoleCardImageUrl = (roleCardName) => {
-  if (!roleCardName) return new URL('../../assets/images/roles/Sherlock1.svg', import.meta.url).href;
-  return new URL(`../../assets/images/roles/${roleCardName}.svg`, import.meta.url).href;
+  if (!roleCardName) return new URL('../../assets/images/TimeBomb/Roles/Sherlock1.svg', import.meta.url).href;
+  return new URL(`../../assets/images/TimeBomb/Roles/${roleCardName}.svg`, import.meta.url).href;
 }
 </script>
 
@@ -237,8 +237,8 @@ const getRoleCardImageUrl = (roleCardName) => {
 
 .my-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 20px 0; min-height: 150px;}
 
-.game-active.holding-scissors { cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, crosshair; }
-.holding-scissors .mini-hand * { cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, pointer !important; }
+.game-active.holding-scissors { cursor: url('/src/assets/images/TimeBomb/Roles/Ciseaux-cursor.svg') 10 10, crosshair; }
+.holding-scissors .mini-hand * { cursor: url('/src/assets/images/TimeBomb/Roles/Ciseaux-cursor.svg') 10 10, pointer !important; }
 .holding-scissors .player-chat-display, .holding-scissors .announce-panel, .holding-scissors button { cursor: default; }
 
 .deal-opponent-enter-active, .deal-opponent-leave-active, .deal-me-enter-active, .deal-me-leave-active { transition: all 0.5s ease; }
@@ -264,11 +264,11 @@ const getRoleCardImageUrl = (roleCardName) => {
 }
 
 .game-active.holding-scissors {
-  cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, crosshair;
+  cursor: url('/src/assets/images/TimeBomb/Cartes/Ciseaux-cursor.svg') 10 10, crosshair;
 }
 
 .holding-scissors .mini-hand * {
-  cursor: url('/src/assets/images/Ciseaux-cursor.svg') 10 10, pointer !important;
+  cursor: url('/src/assets/images/TimeBomb/Cartes/Ciseaux-cursor.svg') 10 10, pointer !important;
 }
 
 @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }

@@ -1,9 +1,10 @@
 // server/games/loupgarou.js
 
 class LoupGarou {
-  constructor(roomCode, playersData, io) {
+  constructor(roomCode, playersData, io, roleComposition = null) {
     this.roomCode = roomCode;
     this.io = io;
+    this.roleComposition = roleComposition; // Composition custom envoyée par le host
     
     // Initialisation des joueurs
     this.players = playersData.map(p => ({
@@ -39,7 +40,11 @@ class LoupGarou {
     const nbPlayers = this.players.length;
     let deck = [];
 
-    if (nbPlayers >= 4) {
+    if (this.roleComposition && this.roleComposition.length === nbPlayers) {
+      // Utiliser la composition custom du host
+      deck = [...this.roleComposition];
+      console.log(`🎭 Composition custom utilisée : ${deck.join(', ')}`);
+    } else if (nbPlayers >= 4) {
       deck.push('Voyante', 'Loup-Garou', 'Loup-Garou');
       if (nbPlayers >= 5) deck.push('Sorciere');
       if (nbPlayers >= 6) deck.push('Cupidon');
@@ -53,6 +58,7 @@ class LoupGarou {
       deck = ['Loup-Garou', 'Voyante', 'Villageois', 'Villageois'].slice(0, nbPlayers);
     }
 
+    // Mélanger le deck
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];

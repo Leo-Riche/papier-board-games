@@ -6,21 +6,21 @@
   >
     <div class="card-face card-back">
       <div class="image-container">
-        <img src="@/assets/images/BackCard.svg" alt="Dos de Carte" />
+        <img src="@/assets/images/TimeBomb/Cartes/BackCard.svg" alt="Dos de Carte" />
       </div>
     </div>
 
     <div class="card-face card-front" :class="type">
       <div class="image-container">
-        <img v-if="type === 'bomb'" src="@/assets/images/Bombe.svg" alt="💥" />
-        <img v-else-if="type === 'defuse'" src="@/assets/images/Desamorceur.svg" alt="✂️✅" />
-        <img v-else-if="type === 'wire'" src="@/assets/images/FilNeutre.svg" alt="⚪" />
+        <img v-if="type === 'bomb'" src="@/assets/images/TimeBomb/Cartes/Bombe.svg" alt="💥" />
+        <img v-else-if="type === 'defuse'" src="@/assets/images/TimeBomb/Cartes/Desamorceur.svg" alt="✂️✅" />
+        <img v-else-if="type === 'wire'" src="@/assets/images/TimeBomb/Cartes/FilNeutre.svg" alt="⚪" />
         
         <div v-else-if="type === 'hidden'" class="unknown-icon-simple">?</div>
       </div>
 
       <div v-if="wasCut" class="cut-indicator-overlay">
-        <img src="@/assets/images/Ciseaux.svg" alt="Coupé" class="cut-scissors-img" />
+        <img src="@/assets/images/TimeBomb/Cartes/Ciseaux.svg" alt="Coupé" class="cut-scissors-img" />
         <div class="cut-glow"></div>
       </div>
 
@@ -32,10 +32,10 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  type: String, // bomb, defuse, wire, hidden
+  type: String,
   isRevealed: Boolean,
-  canBeCut: Boolean, // Pour le tour de jeu
-  wasCut: Boolean    // 👈 NOUVEAU : Propriété pour marquer les cartes coupées
+  canBeCut: Boolean,
+  wasCut: Boolean 
 });
 
 const emit = defineEmits(['cut']);

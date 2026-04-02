@@ -10,13 +10,28 @@
       :players="players"
       :socketId="socketId"
       :amIHost="amIHost"
-      @startGame="handleStartGame"
+      :roleComposition="roleComposition"
+      @start="handleStartGame"
+      @update-composition="handleUpdateComposition"
     />
 
-    <div v-else-if="gameStatus === 'playing'" class="game-placeholder">
-      <h1>La nuit tombe... 🐺</h1>
-      <p>Le plateau de jeu du Loup-Garou arrivera ici !</p>
-    </div>
+    <LoupGarouActiveBoard
+      v-else-if="gameStatus === 'playing'"
+      :roomCode="roomCode"
+      :status="gameState.status"
+      :phase="gameState.phase"
+      :turn="gameState.turn"
+      :winner="gameState.winner"
+      :myName="myName"
+      :myRole="gameState.myRole"
+      :isAlive="gameState.isAlive"
+      :potions="gameState.potions"
+      :nightVictims="gameState.nightVictims"
+      :players="gameState.players"
+      :votes="gameState.votes"
+      :logs="gameState.logs"
+      @action="handleGameAction"
+    />
   </div>
 </template>
 
@@ -25,6 +40,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 import LoupGarouLobbyWait from './LoupGarouLobbyWait.vue'
+import LoupGarouActiveBoard from './LoupGarouActiveBoard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,6 +50,21 @@ const myName = ref('')
 const players = ref([])
 const gameStatus = ref('waiting')
 const socketId = ref('')
+const roleComposition = ref([])
+
+const gameState = ref({
+  status: 'playing',
+  phase: 'lobby',
+  turn: 0,
+  winner: null,
+  myRole: '',
+  isAlive: true,
+  potions: { heal: true, kill: true },
+  nightVictims: [],
+  players: [],
+  votes: {},
+  logs: []
+})
 
 const amIHost = computed(() => {
   return players.value.length > 0 && players.value[0].id === socketId.value;
@@ -74,26 +105,52 @@ onMounted(() => {
   socket.on('game_started', () => {
     gameStatus.value = 'playing';
   });
+
+  // Synchronisation de la composition de rôles (pour les non-host)
+  socket.on('role_composition_updated', (composition) => {
+    roleComposition.value = composition;
+  });
+
+  // État du jeu LoupGarou
+  socket.on('update_loupgarou_state', (state) => {
+    gameState.value = state;
+  });
+
+  socket.on('voyante_result', (data) => {
+    const target = gameState.value.players.find(p => p.id === data.targetId);
+    if (target) {
+      alert(`🔮 La Voyante a vu : ${target.name} est ${data.role}`);
+    }
+  });
 })
 
 onUnmounted(() => {
   if (socket) socket.disconnect();
 })
 
-const handleStartGame = () => {
-  socket.emit('start_loupgarou', roomCode);
+const handleStartGame = (composition) => {
+  socket.emit('start_loupgarou', { roomCode, roleComposition: composition });
+}
+
+const handleUpdateComposition = (composition) => {
+  roleComposition.value = composition;
+  socket.emit('update_role_composition', { roomCode, roleComposition: composition });
+}
+
+const handleGameAction = ({ actionType, targetId }) => {
+  socket.emit('loupgarou_action', { roomCode, actionType, targetId });
 }
 </script>
 
 <style scoped>
 .lg-board-container {
   min-height: 100vh;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  background: #161514;
+  color: #dfd3c3;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Georgia', serif;
+  font-family: 'Space Mono', monospace;
 }
 .loading-screen {
   font-size: 1.5rem;
@@ -101,13 +158,5 @@ const handleStartGame = () => {
   color: #c9ada7;
   animation: pulse 2s infinite;
 }
-.game-placeholder {
-  text-align: center;
-  background: rgba(0,0,0,0.8);
-  padding: 50px;
-  border-radius: 15px;
-  border: 2px solid #8e1a10;
-}
-.game-placeholder h1 { color: #8e1a10; }
 @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
 </style>
