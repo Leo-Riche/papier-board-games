@@ -16,7 +16,10 @@ class LoupGarou {
       isMayor: false,
       hasVoted: false, 
       isReady: false, // Pour skip le timer
-      potions: { heal: true, kill: true } // Pour la sorcière
+      potions: { heal: true, kill: true }, // Pour la sorcière
+      faction: null, // Pour le Chien-Loup ('village' ou 'loups')
+      isInfected: false, // Pour la victime de l'Infect
+      hasInfected: false // Pour l'Infect
     }));
 
     // L'état global de la partie
@@ -31,7 +34,8 @@ class LoupGarou {
       logs: [],
       timeLeft: 0,
       deadHunterId: null,
-      deadMayorId: null
+      deadMayorId: null,
+      hasWolfDied: false
     };
 
     this.timer = null;
@@ -77,11 +81,30 @@ class LoupGarou {
     });
   }
   
+  isPlayerWolf(p) {
+    const wolfRoles = ['Loup-Garou', 'Loup Garou Blanc', 'Loup Garou Voyant', 'Grand Méchant Loup', 'Infect Père des Loups'];
+    return wolfRoles.includes(p.role) || p.isInfected || (p.role === 'Chien-Loup' && p.faction === 'loups');
+  }
+
+  getAliveWolvesCount() {
+    return this.players.filter(p => p.isAlive && this.isPlayerWolf(p)).length;
+  }
+
   isPhaseValidCheck(phase) {
     const aliveRoles = this.players.filter(p => p.isAlive).map(p => p.role);
+    if (phase === 'chien_loup') return aliveRoles.includes('Chien-Loup') && this.state.turn === 0;
     if (phase === 'cupidon') return aliveRoles.includes('Cupidon') && this.state.turn === 0;
+    if (phase === 'loup_voyant') return aliveRoles.includes('Loup Garou Voyant');
     if (phase === 'voyante') return aliveRoles.includes('Voyante');
-    if (phase === 'loups') return aliveRoles.includes('Loup-Garou');
+    if (phase === 'loups') return this.getAliveWolvesCount() > 0;
+    
+    if (phase === 'infect_pere') {
+      const pere = this.players.find(p => p.role === 'Infect Père des Loups' && p.isAlive && !p.hasInfected);
+      return pere !== undefined && this.state.nightVictims.length > 0;
+    }
+    if (phase === 'grand_mechant_loup') return aliveRoles.includes('Grand Méchant Loup') && !this.state.hasWolfDied;
+    if (phase === 'loup_blanc') return aliveRoles.includes('Loup Garou Blanc') && (this.state.turn > 0 && this.state.turn % 2 === 0);
+    
     if (phase === 'sorciere') return aliveRoles.includes('Sorciere');
     if (phase === 'mayor_election') return this.state.turn === 1 && !this.players.some(p => p.isMayor);
     if (phase === 'mayor_succession') return this.state.deadMayorId !== null;
@@ -96,7 +119,7 @@ class LoupGarou {
     this.state.mayorVotes = {};
     this.players.forEach(p => { p.hasVoted = false; p.isReady = false; });
 
-    const phasesSequence = ['cupidon', 'voyante', 'loups', 'sorciere', 'day_debate', 'mayor_election', 'day_vote'];
+    const phasesSequence = ['chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'day_debate', 'mayor_election', 'day_vote'];
     
     if (forcedPhase) {
       this.state.phase = forcedPhase;
@@ -129,7 +152,9 @@ class LoupGarou {
   startTimerForPhase() {
     if (this.timer) clearInterval(this.timer);
     
-    if (['cupidon', 'voyante', 'loups', 'sorciere', 'chasseur_revenge', 'mayor_succession'].includes(this.state.phase)) {
+    const nightActionPhases = ['chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'chasseur_revenge', 'mayor_succession'];
+    
+    if (nightActionPhases.includes(this.state.phase)) {
       this.state.timeLeft = 20;
     } else if (['mayor_election', 'day_debate'].includes(this.state.phase)) {
       this.state.timeLeft = 180; // 3 minutes
@@ -165,6 +190,9 @@ class LoupGarou {
       this.checkChasseurRevengeEnd();
     } else if (this.state.phase === 'mayor_succession') {
       this.randomMayorSuccession();
+    } else if (['grand_mechant_loup', 'loup_blanc'].includes(this.state.phase)) {
+      // S'ils ne font rien, ils skippent juste
+      this.startPhase();
     } else {
       // Pour les autres (voyante, sorciere, cupidon...), on passe
       this.startPhase();
@@ -228,7 +256,15 @@ class LoupGarou {
       }
     }
 
-    else if (this.state.phase === 'voyante' && player.role === 'Voyante' && actionType === 'see') {
+    else if (this.state.phase === 'chien_loup' && player.role === 'Chien-Loup' && actionType === 'choose_faction') {
+      player.faction = targetId; // 'village' ou 'loups'
+      player.hasVoted = true;
+      clearInterval(this.timer);
+      setTimeout(() => this.startPhase(), 2000);
+    }
+
+    else if ((this.state.phase === 'voyante' && player.role === 'Voyante' && actionType === 'see') || 
+             (this.state.phase === 'loup_voyant' && player.role === 'Loup Garou Voyant' && actionType === 'see')) {
       const target = this.players.find(p => p.id === targetId);
       this.io.to(player.id).emit('voyante_result', { targetId: target.id, role: target.role });
       player.hasVoted = true;
@@ -236,17 +272,58 @@ class LoupGarou {
       setTimeout(() => this.startPhase(), 2000);
     }
 
-    else if (this.state.phase === 'loups' && player.role === 'Loup-Garou' && actionType === 'vote') {
+    else if (this.state.phase === 'loups' && this.isPlayerWolf(player) && actionType === 'vote') {
+      // Le Loup Garou Voyant ne peut pas voter sauf s'il est le dernier loup
+      if (player.role === 'Loup Garou Voyant' && this.getAliveWolvesCount() > 1) return;
+
       this.state.votes[targetId] = (this.state.votes[targetId] || 0) + 1;
       player.hasVoted = true;
       
-      const aliveWolves = this.players.filter(p => p.isAlive && p.role === 'Loup-Garou');
-      if (aliveWolves.every(w => w.hasVoted)) {
+      const aliveVotingWolves = this.players.filter(p => p.isAlive && this.isPlayerWolf(p) && !(p.role === 'Loup Garou Voyant' && this.getAliveWolvesCount() > 1));
+      if (aliveVotingWolves.every(w => w.hasVoted)) {
         clearInterval(this.timer);
         this.resolveLoupVote();
       } else {
         this.broadcastState();
       }
+    }
+    
+    else if (this.state.phase === 'infect_pere' && player.role === 'Infect Père des Loups') {
+       if (actionType === 'infect' && !player.hasInfected && this.state.nightVictims.length > 0) {
+          const victimId = this.state.nightVictims[0];
+          const victim = this.players.find(p => p.id === victimId);
+          if (victim) {
+             victim.isInfected = true;
+             // L'Infecté ne meurt pas, on le retire de la liste
+             this.state.nightVictims = this.state.nightVictims.filter(id => id !== victimId);
+             player.hasInfected = true;
+             // Pas de log public pour ça
+          }
+       }
+       player.hasVoted = true;
+       clearInterval(this.timer);
+       setTimeout(() => this.startPhase(), 2000);
+    }
+
+    else if (this.state.phase === 'grand_mechant_loup' && player.role === 'Grand Méchant Loup') {
+       if (actionType === 'kill') {
+         if (!this.state.nightVictims.includes(targetId)) this.state.nightVictims.push(targetId);
+       }
+       player.hasVoted = true;
+       clearInterval(this.timer);
+       setTimeout(() => this.startPhase(), 2000);
+    }
+    
+    else if (this.state.phase === 'loup_blanc' && player.role === 'Loup Garou Blanc') {
+       if (actionType === 'kill') {
+         const target = this.players.find(p => p.id === targetId);
+         if (target && this.isPlayerWolf(target)) { // Ne peut tuer qu'un loup
+            if (!this.state.nightVictims.includes(targetId)) this.state.nightVictims.push(targetId);
+         }
+       }
+       player.hasVoted = true;
+       clearInterval(this.timer);
+       setTimeout(() => this.startPhase(), 2000);
     }
     
     else if (this.state.phase === 'sorciere' && player.role === 'Sorciere') {
@@ -378,6 +455,10 @@ class LoupGarou {
     player.isAlive = false;
     this.addLog(`${player.name} est mort. Il s'agissait de : ${player.role}`);
 
+    if (this.isPlayerWolf(player)) {
+      this.state.hasWolfDied = true; // GML perd son pouvoir
+    }
+
     if (player.isMayor) {
       this.state.deadMayorId = player.id;
     }
@@ -440,18 +521,19 @@ class LoupGarou {
       return true;
     }
 
-    const aliveWolves = alivePlayers.filter(p => p.role === 'Loup-Garou');
-
+    const isLbgAlive = alivePlayers.some(p => p.role === 'Loup Garou Blanc');
+    
     // Victoire des amoureux (seuls survivants et camps différents)
     if (alivePlayers.length === 2 && alivePlayers.every(p => p.isLover)) {
-      if (aliveWolves.length === 1) { // 1 loup + 1 non-loup
-        this.state.status = 'finished';
-        this.state.winner = 'lovers';
-        this.addLog("VICTOIRE DE L'AMOUR ! Les amoureux sont les seuls survivants !");
-        this.broadcastState();
-        return true;
-      }
+       // Si 2 amoureux vivants (peu importe Loup, pas Loup, ou LGB), ils gagnent ensemble
+       this.state.status = 'finished';
+       this.state.winner = 'lovers';
+       this.addLog("VICTOIRE DE L'AMOUR ! Les amoureux sont les seuls survivants !");
+       this.broadcastState();
+       return true;
     }
+
+    const aliveWolves = alivePlayers.filter(p => this.isPlayerWolf(p));
 
     if (aliveWolves.length === 0) {
       this.state.status = 'finished';
@@ -459,14 +541,36 @@ class LoupGarou {
       this.addLog("VICTOIRE DU VILLAGE ! Tous les loups ont été éliminés.");
       this.broadcastState();
       return true;
-    } else if (aliveWolves.length >= alivePlayers.length / 2) {
-      const remainingVillage = alivePlayers.length - aliveWolves.length;
-      if (aliveWolves.length > remainingVillage) {
-         this.state.status = 'finished';
-         this.state.winner = 'loups';
-         this.addLog("VICTOIRE DES LOUPS ! Ils sont désormais majoritaires.");
-         this.broadcastState();
-         return true;
+    } else {
+      if (isLbgAlive) {
+         // Le Loup Garou Blanc veut gagner seul
+         if (alivePlayers.length === 1) {
+            this.state.status = 'finished';
+            this.state.winner = 'loup_blanc';
+            this.addLog("VICTOIRE DU LOUP GAROU BLANC ! Il a réussi à éliminer tous les autres.");
+            this.broadcastState();
+            return true;
+         } else if (aliveWolves.length === 1 && alivePlayers.length === 2) {
+            // S'il est avec 1 villageois, il gagne forcément car il a l'ascendant à la nuit tombée
+            this.state.status = 'finished';
+            this.state.winner = 'loup_blanc';
+            this.addLog("VICTOIRE DU LOUP GAROU BLANC ! Il décime le reste du village.");
+            this.broadcastState();
+            return true;
+         }
+         // Sinon la partie continue car le LGB doit encore tuer le reste des loups ou villageois
+      } else {
+         // Loups normaux
+         if (aliveWolves.length >= alivePlayers.length / 2) {
+            const remainingVillage = alivePlayers.length - aliveWolves.length;
+            if (aliveWolves.length > remainingVillage || remainingVillage === 0) {
+               this.state.status = 'finished';
+               this.state.winner = 'loups';
+               this.addLog("VICTOIRE DES LOUPS ! Ils ont désormais l'ascendant sur le village.");
+               this.broadcastState();
+               return true;
+            }
+         }
       }
     }
     return false;
@@ -494,7 +598,9 @@ class LoupGarou {
         let isRoleVisible = false;
         if (p.id === player.id) isRoleVisible = true;
         if (!player.isAlive || this.state.status === 'finished') isRoleVisible = true;
-        if (player.role === 'Loup-Garou' && p.role === 'Loup-Garou') isRoleVisible = true;
+        
+        // Les loups voient les autres avec leur rôle complet (ou "Infecté")
+        if (this.isPlayerWolf(player) && this.isPlayerWolf(p)) isRoleVisible = true;
         
         // Les amoureux voient mutuellement leur rôle et le Cupidon voit son oeuvre
         if (player.isLover && p.isLover) isRoleVisible = true;
@@ -511,13 +617,13 @@ class LoupGarou {
           isLover: loverVisible, // Amoureux ou Cupidon voient
           hasVoted: p.hasVoted,
           isReady: p.isReady,
-          role: isRoleVisible ? p.role : '???'
+          role: isRoleVisible ? (p.isInfected ? `${p.role} (Infecté)` : p.role) : '???'
         };
       });
 
       let safeVotes = this.state.votes;
       // La petite fille voit les votes des loups
-      if (this.state.phase === 'loups' && player.role !== 'Loup-Garou' && player.role !== 'Petite Fille' && player.isAlive) {
+      if (this.state.phase === 'loups' && !this.isPlayerWolf(player) && player.role !== 'Petite Fille' && player.isAlive) {
         safeVotes = {}; 
       }
       
@@ -532,8 +638,10 @@ class LoupGarou {
         isAlive: player.isAlive,
         isMayor: player.isMayor,
         isLover: player.isLover,
+        isInfected: player.isInfected,
+        faction: player.faction,
         potions: player.potions,
-        nightVictims: (player.role === 'Sorciere' && this.state.phase === 'sorciere') ? this.state.nightVictims : [],
+        nightVictims: (player.role === 'Sorciere' && this.state.phase === 'sorciere') || (player.role === 'Infect Père des Loups' && this.state.phase === 'infect_pere') ? this.state.nightVictims : [],
         players: safePlayersList,
         votes: currentVotes,
         logs: this.state.logs,

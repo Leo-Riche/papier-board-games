@@ -116,19 +116,6 @@
         </button>
       </div>
 
-      <!-- Action de groupe spécifique à Cupidon -->
-      <div class="special-action-panel" v-if="isMyTurn && phase === 'cupidon' && myRole === 'Cupidon'">
-        <h4>Action de Cupidon</h4>
-        <p>Tu dois choisir très exactement 2 cibles.</p>
-        <button 
-          class="action-btn lover-btn" 
-          :disabled="cupidonSelection.length !== 2"
-          @click="confirmCupidonChoice"
-        >
-          Lier ces âmes ({{ cupidonSelection.length }}/2)
-        </button>
-      </div>
-
       <!-- Action spécifique Sorcière -->
       <div class="special-action-panel" v-if="isMyTurn && phase === 'sorciere' && myRole === 'Sorciere'">
         <h4>Action de la Sorcière</h4>
@@ -143,6 +130,34 @@
           <p>Personne n'a été attaqué cette nuit.</p>
         </div>
         <button class="action-btn skip-btn" @click="emitAction('skip', null)">Passer cette étape</button>
+      </div>
+
+      <!-- Action Chien Loup -->
+      <div class="special-action-panel" v-if="isMyTurn && phase === 'chien_loup' && myRole === 'Chien-Loup'">
+        <h4>Le dilemme du Chien-Loup</h4>
+        <p>Peux-tu contenir ton instinct bestial ? Choisis ton camp (c'est définitif !)</p>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button class="action-btn heal-btn" @click="emitAction('choose_faction', 'village')">🧑‍🌾 Village</button>
+          <button class="action-btn poison-btn" @click="emitAction('choose_faction', 'loups')">🐺 Meute</button>
+        </div>
+      </div>
+
+      <!-- Action Infect Père des Loups -->
+      <div class="special-action-panel" v-if="isMyTurn && phase === 'infect_pere' && myRole === 'Infect Père des Loups'">
+        <h4>Infection</h4>
+        <div v-if="nightVictims.length > 0" class="heal-section">
+          <p>La meute s'est acharnée sur : <strong>{{ getPlayerName(nightVictims[0]) }}</strong></p>
+          <p>Tu peux l'infecter au lieu de le tuer (usage unique).</p>
+          <button class="action-btn poison-btn" @click="emitAction('infect', nightVictims[0])" style="margin-bottom: 10px;">🦠 Infecter</button>
+          <button class="action-btn skip-btn" @click="emitAction('skip', null)">Laisser mourir</button>
+        </div>
+      </div>
+
+      <!-- Skip actions (pour GML ou LGB) -->
+      <div class="special-action-panel" v-if="isMyTurn && (phase === 'grand_mechant_loup' || phase === 'loup_blanc')">
+        <h4>Ton action subsidiaire</h4>
+        <p>Tu n'es pas obligé de frapper si ce n'est pas le moment.</p>
+        <button class="action-btn skip-btn" @click="emitAction('skip', null)">Ne rien faire et passer</button>
       </div>
 
       <div class="special-action-panel dead-panel" v-if="!isAlive && phase !== 'chasseur_revenge' && phase !== 'mayor_succession'">
@@ -177,6 +192,8 @@ const props = defineProps({
   isAlive: Boolean,
   isMayor: Boolean,
   isLover: Boolean,
+  isInfected: Boolean,
+  faction: String,
   potions: Object,
   nightVictims: Array,
   players: Array,
@@ -188,7 +205,29 @@ const props = defineProps({
 const emit = defineEmits(['action']);
 
 const me = computed(() => props.players.find(p => p.name === props.myName) || {});
-const isMyTurn = computed(() => props.isAlive && !me.value.hasVoted);
+
+const isWolfString = (roleString) => {
+  if (!roleString || roleString === '???') return false;
+  const wolves = ['Loup-Garou', 'Loup Garou Blanc', 'Loup Garou Voyant', 'Grand Méchant Loup', 'Infect Père des Loups'];
+  return wolves.includes(roleString) || roleString.includes('(Infecté)') || roleString === 'Chien-Loup';
+};
+
+const amIWolf = computed(() => {
+  return isWolfString(props.myRole) || props.isInfected || (props.myRole === 'Chien-Loup' && props.faction === 'loups');
+});
+
+const isMyTurn = computed(() => {
+  if (!props.isAlive) return false;
+  if (me.value.hasVoted) return false;
+  // Specific logic for Loup Voyant voting during 'loups' phase
+  if (props.phase === 'loups' && props.myRole === 'Loup Garou Voyant') {
+    const aliveWolvesCount = props.players.filter(p => p.isAlive && isWolfString(p.role)).length;
+    // The server counts them including us, but Loup-Garou Voyant is included.
+    // If we see more than ourselves, we don't vote (not the last wolf)
+    if (aliveWolvesCount > 1) return false;
+  }
+  return true;
+});
 
 // Pour Cupidon
 const cupidonSelection = ref([]);
@@ -203,8 +242,13 @@ const phaseDisplayName = computed(() => {
   const names = {
     'lobby': "En attente...",
     'cupidon': "Cupidon choisit les amoureux",
+    'chien_loup': "Le Chien-Loup choisit son camp",
+    'loup_voyant': "Le Loup Garou Voyant cible sa victime",
     'voyante': "La Voyante inspecte le village",
     'loups': "Les Loups-Garous choisissent leur proie",
+    'infect_pere': "L'Infect Père des Loups étend la meute",
+    'grand_mechant_loup': "Le Grand Méchant Loup fait un festin",
+    'loup_blanc': "Le Loup Garou Blanc élimine l'un des siens",
     'sorciere': "La Sorcière prépare ses potions",
     'day_debate': "Le jour s'est levé... Débattez !",
     'mayor_election': "Le village vote pour le Maire 👑",
@@ -216,17 +260,19 @@ const phaseDisplayName = computed(() => {
 });
 
 const defaultActionType = computed(() => {
-  if (props.phase === 'voyante') return 'see';
-  if (props.phase === 'loups' || props.phase === 'day_vote') return 'vote';
-  if (props.phase === 'mayor_election') return 'vote';
+  if (props.phase === 'voyante' || props.phase === 'loup_voyant') return 'see';
+  if (props.phase === 'loups' || props.phase === 'day_vote' || props.phase === 'mayor_election') return 'vote';
+  if (props.phase === 'grand_mechant_loup' || props.phase === 'loup_blanc') return 'kill';
   return null;
 });
 
 const actionButtonText = computed(() => {
-  if (props.phase === 'voyante') return '👁️ Inspecter';
+  if (props.phase === 'voyante' || props.phase === 'loup_voyant') return '👁️ Inspecter';
   if (props.phase === 'loups') return '🐺 Dévorer';
   if (props.phase === 'day_vote') return '🔥 Voter';
   if (props.phase === 'mayor_election') return '👑 Élire';
+  if (props.phase === 'grand_mechant_loup') return '🐺 Manger';
+  if (props.phase === 'loup_blanc') return '🗡️ Trahir';
   return 'Agir';
 });
 
@@ -234,7 +280,12 @@ const canTarget = (player) => {
   if (!isMyTurn.value || !player.isAlive) return false;
   
   if (props.phase === 'voyante' && props.myRole === 'Voyante' && player.name !== props.myName) return true;
-  if (props.phase === 'loups' && props.myRole === 'Loup-Garou' && player.role !== 'Loup-Garou') return true;
+  if (props.phase === 'loup_voyant' && props.myRole === 'Loup Garou Voyant' && player.name !== props.myName) return true;
+  
+  if (props.phase === 'loups' && amIWolf.value && !isWolfString(player.role)) return true;
+  if (props.phase === 'grand_mechant_loup' && props.myRole === 'Grand Méchant Loup' && player.name !== props.myName && !isWolfString(player.role)) return true;
+  if (props.phase === 'loup_blanc' && props.myRole === 'Loup Garou Blanc' && player.name !== props.myName && isWolfString(player.role)) return true;
+
   if (props.phase === 'day_vote') return true;
   if (props.phase === 'mayor_election') return true; // On peut voter pour soi-même !
   
@@ -276,13 +327,14 @@ const getPlayerName = (id) => {
 const getRoleImageFilename = (role) => {
   if (!role || role === '???') return 'Villageois.svg';
   let filename = role.replace(/[\s-]/g, '');
-  if (role === 'Sorciere' || role === 'Sorcière') filename = 'Sociere';
+  if (role === 'Sorciere' || role === 'Sorcière') filename = 'Sociere'; // Keep your specific typo logic here
   if (role === 'Necromancien') filename = 'Nécromancien';
   return `${filename}.svg`;
 };
 
 const myRoleImageUrl = computed(() => {
   if (!props.myRole) return '';
+  // Fallback to a valid existing base role if missing advanced images
   return new URL(`../../assets/images/LoupGarou/Roles/${getRoleImageFilename(props.myRole)}`, import.meta.url).href;
 });
 
