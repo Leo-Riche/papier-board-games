@@ -125,7 +125,7 @@ const roleCategories = [
     name: 'Loups-Garous',
     icon: '🐺',
     roles: [
-      { id: 'LoupGarou', name: 'Loup-Garou', file: 'LoupGarou.svg' },
+      { id: 'Loup-Garou', name: 'Loup-Garou', file: 'LoupGarou.svg' },
       { id: 'GrandMechantLoup', name: 'Grand Méchant Loup', file: 'GrandMechantLoup.svg' },
       { id: 'LoupGarouBlanc', name: 'Loup-Garou Blanc', file: 'LoupGarouBlanc.svg' },
       { id: 'LoupGarouVoyant', name: 'Loup-Garou Voyant', file: 'LoupGarouVoyant.svg' },
@@ -145,7 +145,7 @@ const roleCategories = [
       { id: 'Ancien', name: 'Ancien', file: 'Ancien.svg' },
       { id: 'Salvateur', name: 'Salvateur', file: 'Salvateur.svg' },
       { id: 'IdiotDuVillage', name: 'Idiot du Village', file: 'IdiotDuVillage.svg' },
-      { id: 'PetiteFille', name: 'Petite Fille', file: 'PetiteFille.svg' },
+      { id: 'Petite Fille', name: 'Petite Fille', file: 'PetiteFille.svg' },
       { id: 'MontreurDOurs', name: "Montreur d'Ours", file: 'MontreurDOurs.svg' },
       { id: 'ServanteDevouee', name: 'Servante Dévouée', file: 'ServanteDevouee.svg' },
       { id: 'Renard', name: 'Renard', file: 'Renard.svg' },
@@ -277,38 +277,41 @@ const launchGame = () => {
 .lobby-waiting {
   flex: 1; display: flex; flex-direction: column; align-items: center;
   gap: 30px; text-align: center; font-family: 'Space Mono', monospace;
-  padding: 20px; max-height: 100vh; overflow-y: auto; width: 100%;
+  padding: 40px 20px; max-height: 100vh; overflow-y: auto; width: 100%;
+  position: relative; z-index: 1;
 }
 
 h2 {
-  font-family: 'Cormorant Garamond', serif; font-size: 2rem;
-  color: #cda434; font-weight: normal; letter-spacing: 2px; margin: 0;
+  font-family: 'Cormorant Garamond', serif; font-size: 2.2rem;
+  color: #dfd3c3; font-weight: normal; letter-spacing: 3px; margin: 0;
+  text-shadow: 0 2px 10px rgba(211, 84, 0, 0.3);
 }
 
 .players-list-container {
-  background: #1c1a19; border: 1px solid rgba(205, 164, 52, 0.3);
+  background: rgba(18, 17, 16, 0.6); border: 1px solid rgba(230, 126, 34, 0.15);
   padding: 20px 30px; min-width: 350px; max-width: 100%; box-sizing: border-box;
+  border-radius: 8px; backdrop-filter: blur(4px);
 }
 
 .players-list-container h3 {
-  color: #8a8277; font-size: 0.8rem; text-transform: uppercase;
-  letter-spacing: 1px; margin-bottom: 15px; font-weight: normal;
+  color: #7b7369; font-size: 0.8rem; text-transform: uppercase;
+  letter-spacing: 2px; margin-bottom: 20px; font-weight: normal;
 }
 
 .players-list { list-style: none; padding: 0; margin: 0; }
 .players-list li {
-  padding: 8px 0; border-bottom: 1px dashed rgba(223, 211, 195, 0.1);
-  font-size: 0.95rem; color: #dfd3c3; text-align: left;
+  padding: 10px 0; border-bottom: 1px solid rgba(230, 126, 34, 0.05);
+  font-size: 0.95rem; color: #a89a8e; text-align: left;
   display: flex; align-items: center; justify-content: space-between;
 }
 .players-list li:last-child { border-bottom: none; }
 
-.is-me { color: #cda434 !important; font-weight: bold; }
+.is-me { color: #e67e22 !important; font-weight: bold; }
 
 .host-badge {
-  background: rgba(205, 164, 52, 0.15); border: 1px solid rgba(205, 164, 52, 0.4);
-  color: #cda434; font-size: 0.65rem; padding: 2px 8px; text-transform: uppercase;
-  letter-spacing: 1px;
+  background: rgba(230, 126, 34, 0.1); border: 1px solid rgba(230, 126, 34, 0.3);
+  color: #e67e22; font-size: 0.65rem; padding: 2px 8px; text-transform: uppercase;
+  letter-spacing: 1px; border-radius: 2px;
 }
 
 .info-msg {
@@ -319,116 +322,114 @@ h2 {
 .warning-msg { color: #e67e22; border-color: rgba(230, 126, 34, 0.3); background: rgba(230, 126, 34, 0.05); }
 
 .share-btn {
-  background: transparent; color: #dfd3c3; border: 1px solid #5a554f;
-  padding: 8px 15px; cursor: pointer; font-family: 'Space Mono', monospace;
-  font-size: 0.8rem; transition: all 0.2s; text-transform: uppercase;
+  background: transparent; color: #a89a8e; border: 1px solid rgba(230, 126, 34, 0.3);
+  padding: 8px 20px; cursor: pointer; font-family: 'Space Mono', monospace;
+  font-size: 0.8rem; transition: all 0.2s; text-transform: uppercase; border-radius: 4px;
 }
-.share-btn:hover { border-color: #cda434; color: #cda434; }
+.share-btn:hover { border-color: #e67e22; color: #e67e22; background: rgba(230, 126, 34, 0.05); }
 
 /* ========== ROLE COMPOSITION SECTION ========== */
 
 .role-composition-section {
   width: 100%; max-width: 900px;
-  background: #1c1a19; border: 1px solid rgba(205, 164, 52, 0.2);
-  padding: 25px; box-sizing: border-box;
+  background: rgba(18, 17, 16, 0.6); border: 1px solid rgba(230, 126, 34, 0.15);
+  padding: 30px; box-sizing: border-box; border-radius: 8px; backdrop-filter: blur(4px);
 }
 
 .section-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 25px; border-bottom: 1px solid rgba(205, 164, 52, 0.15);
+  margin-bottom: 30px; border-bottom: 1px solid rgba(230, 126, 34, 0.1);
   padding-bottom: 15px;
 }
 
 .section-header h3 {
-  font-family: 'Cormorant Garamond', serif; font-size: 1.5rem;
-  color: #cda434; font-weight: normal; margin: 0; letter-spacing: 1px;
+  font-family: 'Cormorant Garamond', serif; font-size: 1.6rem;
+  color: #dfd3c3; font-weight: normal; margin: 0; letter-spacing: 1px;
 }
 
 .role-counter {
   font-size: 0.85rem; padding: 6px 14px;
-  border: 1px solid #5a554f; color: #8a8277;
-  transition: all 0.3s ease;
+  border: 1px solid rgba(230, 126, 34, 0.3); color: #a89a8e;
+  transition: all 0.3s ease; border-radius: 4px;
 }
 .role-counter.valid {
-  border-color: #2ecc71; color: #2ecc71;
-  background: rgba(46, 204, 113, 0.08);
-  box-shadow: 0 0 12px rgba(46, 204, 113, 0.15);
+  border-color: #e67e22; color: #e67e22;
+  background: rgba(230, 126, 34, 0.08);
 }
 .role-counter.invalid {
-  border-color: #e74c3c; color: #e74c3c;
-  background: rgba(231, 76, 60, 0.08);
+  border-color: #c0392b; color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
 }
 
 .role-category {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
 }
 
 .category-header {
   display: flex; align-items: center; gap: 10px;
-  margin-bottom: 12px; padding-bottom: 6px;
-  border-bottom: 1px dashed rgba(223, 211, 195, 0.1);
+  margin-bottom: 15px; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(230, 126, 34, 0.05);
 }
 
-.category-icon { font-size: 1.2rem; }
+.category-icon { font-size: 1.2rem; opacity: 0.8; }
 
 .category-name {
-  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px;
-  color: #8a8277;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 3px;
+  color: #7b7369;
 }
 
 .roles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .role-card {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 6px; border: 1px solid rgba(223, 211, 195, 0.1);
-  background: rgba(22, 21, 20, 0.6); cursor: pointer;
-  transition: all 0.25s ease; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 6px; border: 1px solid rgba(230, 126, 34, 0.05);
+  background: transparent; cursor: pointer; border-radius: 6px;
+  transition: all 0.2s ease; position: relative;
   user-select: none;
 }
 
 .role-card:not(.disabled):hover {
-  border-color: rgba(205, 164, 52, 0.5);
-  background: rgba(205, 164, 52, 0.05);
+  border-color: rgba(230, 126, 34, 0.3);
+  background: rgba(230, 126, 34, 0.02);
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .role-card.selected {
-  border-color: #cda434;
-  background: rgba(205, 164, 52, 0.1);
-  box-shadow: 0 0 20px rgba(205, 164, 52, 0.15), inset 0 0 15px rgba(205, 164, 52, 0.05);
+  border-color: rgba(230, 126, 34, 0.6);
+  background: rgba(230, 126, 34, 0.05);
+  box-shadow: 0 4px 15px rgba(211, 84, 0, 0.1);
 }
 
 .role-card.disabled {
   cursor: default;
-  opacity: 0.85;
+  opacity: 0.6;
 }
 
 .role-image-wrapper {
-  position: relative; width: 60px; height: 60px;
+  position: relative; width: 55px; height: 55px;
 }
 
 .role-image-wrapper img {
   width: 100%; height: 100%; object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-  transition: filter 0.25s ease;
+  transition: filter 0.2s ease;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
 }
 
 .role-card.selected .role-image-wrapper img {
-  filter: drop-shadow(0 0 8px rgba(205, 164, 52, 0.4));
+  filter: drop-shadow(0 2px 10px rgba(230, 126, 34, 0.3));
 }
 
 .role-count-badge {
-  position: absolute; top: -6px; right: -6px;
-  background: #cda434; color: #161514;
-  width: 22px; height: 22px; border-radius: 50%;
+  position: absolute; top: -8px; right: -8px;
+  background: #e67e22; color: #121110;
+  width: 20px; height: 20px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; font-weight: bold;
-  box-shadow: 0 2px 8px rgba(205, 164, 52, 0.5);
+  font-size: 0.7rem; font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   animation: badgePop 0.2s ease-out;
 }
 
@@ -439,31 +440,29 @@ h2 {
 }
 
 .role-label {
-  font-size: 0.65rem; color: #8a8277; text-align: center;
-  line-height: 1.2; max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  font-size: 0.65rem; color: #7b7369; text-align: center;
+  line-height: 1.2; max-width: 100%; letter-spacing: 0.5px;
 }
 
 .role-card.selected .role-label {
-  color: #dfd3c3;
+  color: #d6c9b3;
 }
 
 .hint-text {
-  font-size: 0.7rem; color: #5a554f; margin-top: 10px;
-  font-style: italic; text-align: center;
+  font-size: 0.7rem; color: #7b7369; margin-top: 15px;
+  font-style: italic; text-align: center; opacity: 0.8;
 }
 
 /* ========== COMPOSITION SUMMARY ========== */
 
 .composition-summary {
-  margin-top: 20px; padding-top: 15px;
-  border-top: 1px dashed rgba(205, 164, 52, 0.2);
+  margin-top: 25px; padding-top: 20px;
+  border-top: 1px solid rgba(230, 126, 34, 0.1);
 }
 
 .composition-summary h4 {
-  font-family: 'Cormorant Garamond', serif; font-size: 1.1rem;
-  color: #cda434; font-weight: normal; margin: 0 0 12px 0;
+  font-family: 'Cormorant Garamond', serif; font-size: 1.2rem;
+  color: #dfd3c3; font-weight: normal; margin: 0 0 15px 0; letter-spacing: 1px;
 }
 
 .summary-tags {
@@ -471,9 +470,13 @@ h2 {
 }
 
 .summary-tag {
-  background: rgba(205, 164, 52, 0.1); border: 1px solid rgba(205, 164, 52, 0.3);
-  color: #dfd3c3; font-size: 0.7rem; padding: 4px 10px;
-  letter-spacing: 0.5px;
+  background: rgba(230, 126, 34, 0.05); border: 1px solid rgba(230, 126, 34, 0.2);
+  color: #a89a8e; font-size: 0.7rem; padding: 4px 12px; border-radius: 4px;
+  letter-spacing: 0.5px; transition: color 0.2s;
+}
+.summary-tag:hover {
+  color: #d6c9b3;
+  border-color: rgba(230, 126, 34, 0.4);
 }
 
 /* ========== LAUNCH SECTION ========== */

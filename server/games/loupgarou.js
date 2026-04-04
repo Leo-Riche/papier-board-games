@@ -13,27 +13,35 @@ class LoupGarou {
       role: null,
       isAlive: true,
       isLover: false,
-      hasVoted: false, // Pour le jour ou les loups
+      isMayor: false,
+      hasVoted: false, 
+      isReady: false, // Pour skip le timer
       potions: { heal: true, kill: true } // Pour la sorcière
     }));
 
     // L'état global de la partie
     this.state = {
       status: 'starting', // starting, playing, finished
-      phase: 'lobby', // lobby, cupidon, voyante, loups, sorciere, day_debate, day_vote
+      phase: 'lobby', 
       turn: 0,
       winner: null,
       nightVictims: [],
       votes: {},
-      logs: []
+      mayorVotes: {},
+      logs: [],
+      timeLeft: 0,
+      deadHunterId: null,
+      deadMayorId: null
     };
+
+    this.timer = null;
   }
 
   start() {
     this.assignRoles();
     this.state.status = 'playing';
     this.addLog("Le village s'endort pour sa première nuit...");
-    this.nextPhase('cupidon');
+    this.startPhase('cupidon');
   }
 
   assignRoles() {
@@ -69,13 +77,26 @@ class LoupGarou {
     });
   }
   
-  nextPhase(forcedPhase = null) {
+  isPhaseValidCheck(phase) {
+    const aliveRoles = this.players.filter(p => p.isAlive).map(p => p.role);
+    if (phase === 'cupidon') return aliveRoles.includes('Cupidon') && this.state.turn === 0;
+    if (phase === 'voyante') return aliveRoles.includes('Voyante');
+    if (phase === 'loups') return aliveRoles.includes('Loup-Garou');
+    if (phase === 'sorciere') return aliveRoles.includes('Sorciere');
+    if (phase === 'mayor_election') return this.state.turn === 1 && !this.players.some(p => p.isMayor);
+    if (phase === 'mayor_succession') return this.state.deadMayorId !== null;
+    if (phase === 'chasseur_revenge') return this.state.deadHunterId !== null;
+    return true;
+  }
+
+  startPhase(forcedPhase = null) {
     if (this.checkWinCondition()) return;
 
     this.state.votes = {};
-    this.players.forEach(p => p.hasVoted = false);
+    this.state.mayorVotes = {};
+    this.players.forEach(p => { p.hasVoted = false; p.isReady = false; });
 
-    const phasesSequence = ['voyante', 'loups', 'sorciere', 'day_debate', 'day_vote'];
+    const phasesSequence = ['cupidon', 'voyante', 'loups', 'sorciere', 'day_debate', 'mayor_election', 'day_vote'];
     
     if (forcedPhase) {
       this.state.phase = forcedPhase;
@@ -84,41 +105,135 @@ class LoupGarou {
       let nextIndex = currentIndex + 1;
       
       if (nextIndex >= phasesSequence.length) {
-        nextIndex = 0;
+        nextIndex = 1; // On skip Cupidon qui n'est qu'au tour 0 (index 0)
         this.state.turn++;
         this.state.nightVictims = [];
       }
       this.state.phase = phasesSequence[nextIndex];
     }
 
-    this.skipDeadRolesPhases();
+    // Skip de phases si rôle mort ou inutile
+    if (!this.isPhaseValidCheck(this.state.phase)) {
+      return this.startPhase(); // Passe à la phase suivante
+    }
 
     if (this.state.phase === 'day_debate') {
       this.resolveNight();
+      if (this.state.phase !== 'day_debate') return; // Si la résolution déclenche Chasseur/Maire, la phase change, on stop
     }
 
+    this.startTimerForPhase();
     this.broadcastState();
   }
 
-  skipDeadRolesPhases() {
-    const aliveRoles = this.players.filter(p => p.isAlive).map(p => p.role);
+  startTimerForPhase() {
+    if (this.timer) clearInterval(this.timer);
     
-    if (this.state.phase === 'cupidon' && (!aliveRoles.includes('Cupidon') || this.state.turn > 0)) this.nextPhase();
-    else if (this.state.phase === 'voyante' && !aliveRoles.includes('Voyante')) this.nextPhase();
-    else if (this.state.phase === 'sorciere' && !aliveRoles.includes('Sorciere')) this.nextPhase();
+    if (['cupidon', 'voyante', 'loups', 'sorciere', 'chasseur_revenge', 'mayor_succession'].includes(this.state.phase)) {
+      this.state.timeLeft = 20;
+    } else if (['mayor_election', 'day_debate'].includes(this.state.phase)) {
+      this.state.timeLeft = 180; // 3 minutes
+    } else if (this.state.phase === 'day_vote') {
+      this.state.timeLeft = 30;
+    } else {
+      this.state.timeLeft = 0;
+    }
+
+    if (this.state.timeLeft > 0) {
+      this.timer = setInterval(() => {
+        this.state.timeLeft--;
+        if (this.state.timeLeft <= 0) {
+          clearInterval(this.timer);
+          this.handleTimerEnd();
+        } else {
+          this.io.to(this.roomCode).emit('timer_update', this.state.timeLeft);
+        }
+      }, 1000);
+    }
   }
-  
+
+  handleTimerEnd() {
+    if (this.state.phase === 'loups') {
+      this.resolveLoupVote();
+    } else if (this.state.phase === 'day_vote') {
+      this.resolveDayVote();
+    } else if (this.state.phase === 'mayor_election') {
+      this.resolveMayorElection();
+    } else if (this.state.phase === 'chasseur_revenge') {
+      this.addLog("Le Chasseur n'a pas pu tirer à temps...");
+      this.state.deadHunterId = null;
+      this.checkChasseurRevengeEnd();
+    } else if (this.state.phase === 'mayor_succession') {
+      this.randomMayorSuccession();
+    } else {
+      // Pour les autres (voyante, sorciere, cupidon...), on passe
+      this.startPhase();
+    }
+  }
+
   handleAction(playerId, actionType, targetId) {
     if (this.state.status !== 'playing') return;
     
     const player = this.players.find(p => p.id === playerId);
+    
+    // Action Ready / Passer
+    if (actionType === 'ready' && player.isAlive) {
+      player.isReady = true;
+      const alivePlayers = this.players.filter(p => p.isAlive);
+      if (alivePlayers.every(p => p.isReady)) {
+        clearInterval(this.timer);
+        this.handleTimerEnd();
+      } else {
+        this.broadcastState();
+      }
+      return;
+    }
+
+    // Le maire mort choisit son successeur
+    if (this.state.phase === 'mayor_succession' && playerId === this.state.deadMayorId && actionType === 'mayor_successor') {
+      const target = this.players.find(p => p.id === targetId);
+      if (target && target.isAlive) {
+        clearInterval(this.timer);
+        target.isMayor = true;
+        this.state.deadMayorId = null;
+        this.addLog(`${target.name} a été nommé nouveau Maire par l'ancien !`);
+        this.checkChasseurRevengeEnd();
+      }
+      return;
+    }
+
+    // Le chasseur mort choisit qui tirer
+    if (this.state.phase === 'chasseur_revenge' && playerId === this.state.deadHunterId && actionType === 'chasseur_kill') {
+      clearInterval(this.timer);
+      this.state.deadHunterId = null;
+      const targetName = this.players.find(p => p.id === targetId).name;
+      this.addLog(`Le Chasseur tire dans son dernier souffle et abat ${targetName} !`);
+      this.killPlayerSoft(targetId);
+      this.checkChasseurRevengeEnd();
+      return;
+    }
+
     if (!player || !player.isAlive) return;
 
-    if (this.state.phase === 'voyante' && player.role === 'Voyante' && actionType === 'see') {
+    if (this.state.phase === 'cupidon' && player.role === 'Cupidon' && actionType === 'cupidon_choose') {
+      // targetId est un tableau d'ids, ex: [id1, id2]
+      if (Array.isArray(targetId) && targetId.length === 2) {
+        clearInterval(this.timer);
+        this.players.forEach(p => {
+          if (targetId.includes(p.id)) p.isLover = true;
+        });
+        player.hasVoted = true;
+        this.addLog("Cupidon a décoché ses flèches de l'Amour.");
+        setTimeout(() => this.startPhase(), 2000);
+      }
+    }
+
+    else if (this.state.phase === 'voyante' && player.role === 'Voyante' && actionType === 'see') {
       const target = this.players.find(p => p.id === targetId);
       this.io.to(player.id).emit('voyante_result', { targetId: target.id, role: target.role });
       player.hasVoted = true;
-      setTimeout(() => this.nextPhase(), 3000);
+      clearInterval(this.timer);
+      setTimeout(() => this.startPhase(), 2000);
     }
 
     else if (this.state.phase === 'loups' && player.role === 'Loup-Garou' && actionType === 'vote') {
@@ -127,11 +242,11 @@ class LoupGarou {
       
       const aliveWolves = this.players.filter(p => p.isAlive && p.role === 'Loup-Garou');
       if (aliveWolves.every(w => w.hasVoted)) {
-        const target = Object.keys(this.state.votes).reduce((a, b) => this.state.votes[a] > this.state.votes[b] ? a : b);
-        this.state.nightVictims.push(target);
-        setTimeout(() => this.nextPhase(), 2000);
+        clearInterval(this.timer);
+        this.resolveLoupVote();
+      } else {
+        this.broadcastState();
       }
-      this.broadcastState();
     }
     
     else if (this.state.phase === 'sorciere' && player.role === 'Sorciere') {
@@ -141,17 +256,35 @@ class LoupGarou {
       } else if (actionType === 'kill' && player.potions.kill) {
         if (!this.state.nightVictims.includes(targetId)) this.state.nightVictims.push(targetId);
         player.potions.kill = false;
+      } else if (actionType === 'skip') {
+         // ne rien faire
       }
       player.hasVoted = true;
-      setTimeout(() => this.nextPhase(), 2000);
+      clearInterval(this.timer);
+      setTimeout(() => this.startPhase(), 2000);
     }
 
-    else if (this.state.phase === 'day_vote' && actionType === 'vote') {
-      this.state.votes[targetId] = (this.state.votes[targetId] || 0) + 1;
+    else if (this.state.phase === 'mayor_election' && actionType === 'vote') {
+      this.state.mayorVotes[targetId] = (this.state.mayorVotes[targetId] || 0) + 1;
       player.hasVoted = true;
       
       const alivePlayers = this.players.filter(p => p.isAlive);
       if (alivePlayers.every(p => p.hasVoted)) {
+        clearInterval(this.timer);
+        this.resolveMayorElection();
+      } else {
+        this.broadcastState();
+      }
+    }
+
+    else if (this.state.phase === 'day_vote' && actionType === 'vote') {
+      const voteWeight = player.isMayor ? 2 : 1; // Le maire a un vote double
+      this.state.votes[targetId] = (this.state.votes[targetId] || 0) + voteWeight;
+      player.hasVoted = true;
+      
+      const alivePlayers = this.players.filter(p => p.isAlive);
+      if (alivePlayers.every(p => p.hasVoted)) {
+        clearInterval(this.timer);
         this.resolveDayVote();
       } else {
         this.broadcastState();
@@ -159,14 +292,59 @@ class LoupGarou {
     }
   }
 
+  resolveLoupVote() {
+    if (Object.keys(this.state.votes).length > 0) {
+      const target = Object.keys(this.state.votes).reduce((a, b) => this.state.votes[a] > this.state.votes[b] ? a : b);
+      if (!this.state.nightVictims.includes(target)) {
+        this.state.nightVictims.push(target);
+      }
+    }
+    this.broadcastState();
+    setTimeout(() => this.startPhase(), 2000);
+  }
+
+  resolveMayorElection() {
+    if (Object.keys(this.state.mayorVotes).length > 0) {
+      let maxVotes = 0;
+      let targetCandidates = [];
+      for (const [targetId, count] of Object.entries(this.state.mayorVotes)) {
+        if (count > maxVotes) {
+          maxVotes = count;
+          targetCandidates = [targetId];
+        } else if (count === maxVotes) {
+          targetCandidates.push(targetId);
+        }
+      }
+      
+      // En cas d'égalité on prend quelqu'un au hasard parmi les vainqueurs
+      const elected = targetCandidates[Math.floor(Math.random() * targetCandidates.length)];
+      const player = this.players.find(p => p.id === elected);
+      if (player) {
+        player.isMayor = true;
+        this.addLog(`Le village a élu ${player.name} en tant que Maire !`);
+      }
+    } else {
+      this.addLog(`Le village n'a pas pu se décider pour un Maire.`);
+    }
+    this.broadcastState();
+    setTimeout(() => this.startPhase(), 3000);
+  }
+
   resolveNight() {
     this.addLog("Le soleil se lève sur le village...");
     if (this.state.nightVictims.length === 0) {
       this.addLog("Merveilleuse nouvelle, personne n'est mort cette nuit !");
     } else {
-      this.state.nightVictims.forEach(victimId => {
-        this.killPlayer(victimId);
-      });
+       const victims = [...this.state.nightVictims];
+       victims.forEach(victimId => {
+         this.killPlayerSoft(victimId);
+       });
+    }
+    
+    if (this.state.deadHunterId !== null) {
+      this.state.phase = 'chasseur_revenge';
+    } else if (this.state.deadMayorId !== null) {
+      this.state.phase = 'mayor_succession';
     }
   }
 
@@ -184,32 +362,97 @@ class LoupGarou {
     }
 
     if (victims.length === 1) {
-      this.killPlayer(victims[0]);
       this.addLog(`Le village a décidé d'éliminer un joueur suite au vote.`);
+      this.killPlayerSoft(victims[0]);
     } else {
-      this.addLog("Égalité parfaite aux votes ! Le village n'élimine personne aujourd'hui.");
+      this.addLog("Égalité aux votes ! Le village n'élimine personne aujourd'hui.");
     }
     
-    setTimeout(() => this.nextPhase(), 5000);
+    this.checkChasseurRevengeEnd();
   }
 
-  killPlayer(playerId) {
+  killPlayerSoft(playerId) {
     const player = this.players.find(p => p.id === playerId);
-    if (player && player.isAlive) {
-      player.isAlive = false;
-      this.addLog(`Un joueur est mort. Il s'agissait de : ${player.role}`);
-      
-      if (player.role === 'Chasseur') {
-         this.addLog("Le Chasseur a été tué ! Il doit emporter quelqu'un avec lui...");
-         this.state.phase = 'chasseur_revenge';
+    if (!player || !player.isAlive) return;
+
+    player.isAlive = false;
+    this.addLog(`${player.name} est mort. Il s'agissait de : ${player.role}`);
+
+    if (player.isMayor) {
+      this.state.deadMayorId = player.id;
+    }
+
+    if (player.role === 'Chasseur') {
+      this.state.deadHunterId = player.id;
+    }
+
+    // Gestion de l'amour
+    if (player.isLover) {
+      const otherLover = this.players.find(p => p.isLover && p.id !== player.id && p.isAlive);
+      if (otherLover) {
+        this.addLog(`${otherLover.name} meurt de chagrin suite à la mort de sa moitié... Il/Elle était : ${otherLover.role}`);
+        otherLover.isAlive = false;
+        if (otherLover.isMayor) this.state.deadMayorId = otherLover.id;
+        if (otherLover.role === 'Chasseur') this.state.deadHunterId = otherLover.id;
       }
     }
   }
 
+  checkChasseurRevengeEnd() {
+    this.broadcastState();
+    // S'il y a un mort à gérer post-mort :
+    if (this.state.deadHunterId !== null) {
+      this.startPhase('chasseur_revenge');
+    } else if (this.state.deadMayorId !== null) {
+      this.startPhase('mayor_succession');
+    } else {
+      // Reprendre normalement 
+      if (this.state.phase === 'day_vote') {
+        setTimeout(() => this.startPhase(), 5000); 
+      } else if (this.state.phase === 'day_debate') {
+        // La nuit est résolue et les morts post-nuit traités, on peut relancer startPhase
+        setTimeout(() => this.startPhase(), 3000);
+      } else {
+        setTimeout(() => this.startPhase(), 3000);
+      }
+    }
+  }
+
+  randomMayorSuccession() {
+    this.addLog("Le maire mort n'a pas nommé de successeur... Le hasard choisit.");
+    const alivePlayers = this.players.filter(p => p.isAlive);
+    if (alivePlayers.length > 0) {
+      const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+      target.isMayor = true;
+      this.addLog(`${target.name} est désigné Maire aléatoirement.`);
+    }
+    this.state.deadMayorId = null;
+    this.checkChasseurRevengeEnd();
+  }
+
   checkWinCondition() {
     const alivePlayers = this.players.filter(p => p.isAlive);
+    if (alivePlayers.length === 0) {
+      this.state.status = 'finished';
+      this.state.winner = 'draw';
+      this.addLog("Tout le monde est mort ! C'est un match nul.");
+      this.broadcastState();
+      return true;
+    }
+
     const aliveWolves = alivePlayers.filter(p => p.role === 'Loup-Garou');
-    
+
+    // Victoire des amoureux (seuls survivants et camps différents)
+    if (alivePlayers.length === 2 && alivePlayers.every(p => p.isLover)) {
+      if (aliveWolves.length === 1) { // 1 loup + 1 non-loup
+        this.state.status = 'finished';
+        this.state.winner = 'lovers';
+        this.addLog("VICTOIRE DE L'AMOUR ! Les amoureux sont les seuls survivants !");
+        this.broadcastState();
+        return true;
+      }
+    }
+
     if (aliveWolves.length === 0) {
       this.state.status = 'finished';
       this.state.winner = 'village';
@@ -217,11 +460,14 @@ class LoupGarou {
       this.broadcastState();
       return true;
     } else if (aliveWolves.length >= alivePlayers.length / 2) {
-      this.state.status = 'finished';
-      this.state.winner = 'loups';
-      this.addLog("VICTOIRE DES LOUPS ! Ils sont désormais majoritaires.");
-      this.broadcastState();
-      return true;
+      const remainingVillage = alivePlayers.length - aliveWolves.length;
+      if (aliveWolves.length > remainingVillage) {
+         this.state.status = 'finished';
+         this.state.winner = 'loups';
+         this.addLog("VICTOIRE DES LOUPS ! Ils sont désormais majoritaires.");
+         this.broadcastState();
+         return true;
+      }
     }
     return false;
   }
@@ -229,6 +475,16 @@ class LoupGarou {
   addLog(msg) {
     this.state.logs.push(msg);
     this.io.to(this.roomCode).emit('game_log', msg);
+  }
+
+  reconnectPlayer(newSocketId, playerName) {
+    if (this.state.status !== 'playing') return false;
+    const player = this.players.find(p => p.name === playerName);
+    if (player) {
+      player.id = newSocketId;
+      return true;
+    }
+    return false;
   }
 
   broadcastState() {
@@ -239,20 +495,33 @@ class LoupGarou {
         if (p.id === player.id) isRoleVisible = true;
         if (!player.isAlive || this.state.status === 'finished') isRoleVisible = true;
         if (player.role === 'Loup-Garou' && p.role === 'Loup-Garou') isRoleVisible = true;
+        
+        // Les amoureux voient mutuellement leur rôle et le Cupidon voit son oeuvre
+        if (player.isLover && p.isLover) isRoleVisible = true;
+        
+        let loverVisible = false;
+        if (player.isLover && p.isLover) loverVisible = true;
+        if (player.role === 'Cupidon' && p.isLover) loverVisible = true;
 
         return {
           id: p.id,
           name: p.name,
           isAlive: p.isAlive,
+          isMayor: p.isMayor,
+          isLover: loverVisible, // Amoureux ou Cupidon voient
           hasVoted: p.hasVoted,
+          isReady: p.isReady,
           role: isRoleVisible ? p.role : '???'
         };
       });
 
       let safeVotes = this.state.votes;
-      if (this.state.phase === 'loups' && player.role !== 'Loup-Garou' && player.isAlive) {
+      // La petite fille voit les votes des loups
+      if (this.state.phase === 'loups' && player.role !== 'Loup-Garou' && player.role !== 'Petite Fille' && player.isAlive) {
         safeVotes = {}; 
       }
+      
+      let currentVotes = this.state.phase === 'mayor_election' ? this.state.mayorVotes : safeVotes;
 
       this.io.to(player.id).emit('update_loupgarou_state', {
         status: this.state.status,
@@ -261,10 +530,14 @@ class LoupGarou {
         winner: this.state.winner,
         myRole: player.role,
         isAlive: player.isAlive,
+        isMayor: player.isMayor,
+        isLover: player.isLover,
         potions: player.potions,
-        nightVictims: (player.role === 'Sorciere' && this.state.phase === 'sorciere') ? this.state.nightVictims : [], // Seule la sorcière voit les morts de la nuit en cours
+        nightVictims: (player.role === 'Sorciere' && this.state.phase === 'sorciere') ? this.state.nightVictims : [],
         players: safePlayersList,
-        votes: safeVotes
+        votes: currentVotes,
+        logs: this.state.logs,
+        timeLeft: this.state.timeLeft
       });
     });
   }
