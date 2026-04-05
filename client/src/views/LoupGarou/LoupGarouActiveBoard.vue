@@ -142,6 +142,23 @@
         </div>
       </div>
 
+      <!-- Action Voleur -->
+      <div class="special-action-panel voleur-panel" v-if="isMyTurn && phase === 'voleur' && myRole === 'Voleur'">
+        <h4>Le Butin du Voleur</h4>
+        <p>Tu peux échanger ton rôle avec l'une de ces deux cartes.</p>
+        <div class="center-cards-container">
+           <div class="center-card" v-for="(cardRole, idx) in centerCards" :key="'center-'+idx">
+             <div class="role-image-wrapper">
+                <img :src="getRoleImageUrlByName(cardRole)" :alt="cardRole" @error="handleImageError"/>
+             </div>
+             <p class="card-role-name">{{ cardRole }}</p>
+             <button class="action-btn" @click="emitAction('voleur_choose', idx)">Prendre</button>
+           </div>
+        </div>
+        <p v-if="mustVoleurSwap" class="warning-text">⚠️ Tu es obligé d'échanger car les deux cartes sont des Loups !</p>
+        <button v-else class="action-btn skip-btn mt-2" @click="emitAction('skip', null)">Ne rien faire (Garder Voleur)</button>
+      </div>
+
       <!-- Action Infect Père des Loups -->
       <div class="special-action-panel" v-if="isMyTurn && phase === 'infect_pere' && myRole === 'Infect Père des Loups'">
         <h4>Infection</h4>
@@ -198,6 +215,7 @@ const props = defineProps({
   nightVictims: Array,
   players: Array,
   votes: Object,
+  centerCards: Array,
   logs: Array,
   timeLeft: Number
 });
@@ -241,6 +259,7 @@ const phaseDisplayName = computed(() => {
   if (props.status === 'finished') return "PARTIE TERMINÉE";
   const names = {
     'lobby': "En attente...",
+    'voleur': "Le Voleur observe son butin",
     'cupidon': "Cupidon choisit les amoureux",
     'chien_loup': "Le Chien-Loup choisit son camp",
     'loup_voyant': "Le Loup Garou Voyant cible sa victime",
@@ -338,6 +357,19 @@ const myRoleImageUrl = computed(() => {
   return new URL(`../../assets/images/LoupGarou/Roles/${getRoleImageFilename(props.myRole)}`, import.meta.url).href;
 });
 
+const getRoleImageUrlByName = (role) => {
+  if (!role) return '';
+  return new URL(`../../assets/images/LoupGarou/Roles/${getRoleImageFilename(role)}`, import.meta.url).href;
+};
+
+const mustVoleurSwap = computed(() => {
+  if (props.phase === 'voleur' && props.centerCards && props.centerCards.length === 2) {
+    const wolves = ['Loup-Garou', 'Loup Garou Blanc', 'Loup Garou Voyant', 'Grand Méchant Loup', 'Infect Père des Loups'];
+    return props.centerCards.every(c => wolves.includes(c));
+  }
+  return false;
+});
+
 const handleImageError = (e) => {
   // Fallback si l'image du rôle n'existe pas
   e.target.src = new URL(`../../assets/images/LoupGarou/Roles/Villageois.svg`, import.meta.url).href;
@@ -427,4 +459,12 @@ const handleImageError = (e) => {
   .game-logs-sidebar { border-left: none; border-top: 1px solid rgba(230, 126, 34, 0.1); padding-left: 0; padding-top: 20px; max-width: 100%; min-height: 200px; padding-right: 0;}
   .my-area { flex-direction: column; text-align: center; gap: 30px; padding: 20px 15px;}
 }
+
+.center-cards-container { display: flex; justify-content: center; gap: 20px; margin-top: 15px; margin-bottom: 15px; }
+.center-card { display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(230, 126, 34, 0.2); }
+.center-card .role-image-wrapper { width: 80px; height: 80px; }
+.center-card .role-image-wrapper img { width: 100%; height: 100%; object-fit: contain; }
+.card-role-name { font-size: 0.8rem; margin: 0; color: #dfd3c3; }
+.warning-text { color: #e74c3c !important; font-size: 0.8rem !important; font-weight: bold; }
+.mt-2 { margin-top: 10px; }
 </style>

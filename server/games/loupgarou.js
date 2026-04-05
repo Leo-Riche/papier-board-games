@@ -33,9 +33,12 @@ class LoupGarou {
       mayorVotes: {},
       logs: [],
       timeLeft: 0,
+      logs: [],
+      timeLeft: 0,
       deadHunterId: null,
       deadMayorId: null,
-      hasWolfDied: false
+      hasWolfDied: false,
+      centerCards: []
     };
 
     this.timer = null;
@@ -45,17 +48,52 @@ class LoupGarou {
     this.assignRoles();
     this.state.status = 'playing';
     this.addLog("Le village s'endort pour sa première nuit...");
-    this.startPhase('cupidon');
+    this.startPhase('voleur');
   }
 
   assignRoles() {
     const nbPlayers = this.players.length;
     let deck = [];
 
-    if (this.roleComposition && this.roleComposition.length === nbPlayers) {
+    const hasVoleur = this.roleComposition && this.roleComposition.includes('Voleur');
+    const expectedDeckSize = hasVoleur ? nbPlayers + 2 : nbPlayers;
+
+    if (this.roleComposition && this.roleComposition.length === expectedDeckSize) {
       // Utiliser la composition custom du host
       deck = [...this.roleComposition];
       console.log(`🎭 Composition custom utilisée : ${deck.join(', ')}`);
+      
+      if (hasVoleur) {
+         // S'assurer que le Voleur est distribué à un joueur (non mis au centre)
+         const voleurIndex = deck.indexOf('Voleur');
+         deck.splice(voleurIndex, 1); // deck a mtn length: nbPlayers + 1
+         
+         // Mélanger les N+1 cartes
+         for (let i = deck.length - 1; i > 0; i--) {
+           const j = Math.floor(Math.random() * (i + 1));
+           [deck[i], deck[j]] = [deck[j], deck[i]];
+         }
+         
+         // Les 2 dernières cartes vont au centre
+         this.state.centerCards = deck.slice(nbPlayers - 1);
+         
+         // Les N-1 premières cartes vont aux joueurs, + le Voleur
+         const playerDeck = deck.slice(0, nbPlayers - 1);
+         playerDeck.push('Voleur');
+         
+         // On mélange le deck des joueurs
+         for (let i = playerDeck.length - 1; i > 0; i--) {
+           const j = Math.floor(Math.random() * (i + 1));
+           [playerDeck[i], playerDeck[j]] = [playerDeck[j], playerDeck[i]];
+         }
+         
+         // Distribution
+         this.players.forEach((player, i) => {
+           player.role = playerDeck[i];
+         });
+         
+         return; // Attribution terminée
+      }
     } else if (nbPlayers >= 4) {
       deck.push('Voyante', 'Loup-Garou', 'Loup-Garou');
       if (nbPlayers >= 5) deck.push('Sorciere');
@@ -70,7 +108,7 @@ class LoupGarou {
       deck = ['Loup-Garou', 'Voyante', 'Villageois', 'Villageois'].slice(0, nbPlayers);
     }
 
-    // Mélanger le deck
+    // Mélanger le deck (cas sans voleur ou sans composition)
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -79,6 +117,10 @@ class LoupGarou {
     this.players.forEach((player, i) => {
       player.role = deck[i];
     });
+
+    if (deck.length > nbPlayers) {
+      this.state.centerCards = deck.slice(nbPlayers);
+    }
   }
   
   isPlayerWolf(p) {
@@ -92,6 +134,7 @@ class LoupGarou {
 
   isPhaseValidCheck(phase) {
     const aliveRoles = this.players.filter(p => p.isAlive).map(p => p.role);
+    if (phase === 'voleur') return aliveRoles.includes('Voleur') && this.state.turn === 0;
     if (phase === 'chien_loup') return aliveRoles.includes('Chien-Loup') && this.state.turn === 0;
     if (phase === 'cupidon') return aliveRoles.includes('Cupidon') && this.state.turn === 0;
     if (phase === 'loup_voyant') return aliveRoles.includes('Loup Garou Voyant');
@@ -119,7 +162,7 @@ class LoupGarou {
     this.state.mayorVotes = {};
     this.players.forEach(p => { p.hasVoted = false; p.isReady = false; });
 
-    const phasesSequence = ['chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'day_debate', 'mayor_election', 'day_vote'];
+    const phasesSequence = ['voleur', 'chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'day_debate', 'mayor_election', 'day_vote'];
     
     if (forcedPhase) {
       this.state.phase = forcedPhase;
@@ -152,10 +195,10 @@ class LoupGarou {
   startTimerForPhase() {
     if (this.timer) clearInterval(this.timer);
     
-    const nightActionPhases = ['chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'chasseur_revenge', 'mayor_succession'];
+    const nightActionPhases = ['voleur', 'chien_loup', 'cupidon', 'loup_voyant', 'voyante', 'loups', 'infect_pere', 'grand_mechant_loup', 'loup_blanc', 'sorciere', 'chasseur_revenge', 'mayor_succession'];
     
     if (nightActionPhases.includes(this.state.phase)) {
-      this.state.timeLeft = 20;
+      this.state.timeLeft = 30; // on peut unifier à 30 secondes pour pallier le voleur ou garder 20s
     } else if (['mayor_election', 'day_debate'].includes(this.state.phase)) {
       this.state.timeLeft = 180; // 3 minutes
     } else if (this.state.phase === 'day_vote') {
@@ -190,8 +233,17 @@ class LoupGarou {
       this.checkChasseurRevengeEnd();
     } else if (this.state.phase === 'mayor_succession') {
       this.randomMayorSuccession();
-    } else if (['grand_mechant_loup', 'loup_blanc'].includes(this.state.phase)) {
-      // S'ils ne font rien, ils skippent juste
+    } else if (['grand_mechant_loup', 'loup_blanc', 'voleur'].includes(this.state.phase)) {
+      if (this.state.phase === 'voleur') {
+         const voleur = this.players.find(p => p.role === 'Voleur');
+         if (voleur && !voleur.hasVoted) {
+            const wolves = ['Loup-Garou', 'Loup Garou Blanc', 'Loup Garou Voyant', 'Grand Méchant Loup', 'Infect Père des Loups'];
+            if (this.state.centerCards && this.state.centerCards.length === 2 && this.state.centerCards.every(c => wolves.includes(c))) {
+               voleur.role = this.state.centerCards[Math.floor(Math.random() * 2)];
+               this.addLog("Le Voleur a été contraint spirituellement de rejoindre la meute.");
+            }
+         }
+      }
       this.startPhase();
     } else {
       // Pour les autres (voyante, sorciere, cupidon...), on passe
@@ -243,7 +295,24 @@ class LoupGarou {
 
     if (!player || !player.isAlive) return;
 
-    if (this.state.phase === 'cupidon' && player.role === 'Cupidon' && actionType === 'cupidon_choose') {
+    if (this.state.phase === 'voleur' && player.role === 'Voleur') {
+       if (actionType === 'voleur_choose') {
+          const idx = parseInt(targetId);
+          if (idx === 0 || idx === 1) {
+             player.role = this.state.centerCards[idx];
+          }
+       } else if (actionType === 'skip') {
+          const wolves = ['Loup-Garou', 'Loup Garou Blanc', 'Loup Garou Voyant', 'Grand Méchant Loup', 'Infect Père des Loups'];
+          if (this.state.centerCards.every(c => wolves.includes(c))) {
+             return; // Rejeté, doit choisir
+          }
+       }
+       player.hasVoted = true;
+       clearInterval(this.timer);
+       setTimeout(() => this.startPhase(), 2000);
+    }
+
+    else if (this.state.phase === 'cupidon' && player.role === 'Cupidon' && actionType === 'cupidon_choose') {
       // targetId est un tableau d'ids, ex: [id1, id2]
       if (Array.isArray(targetId) && targetId.length === 2) {
         clearInterval(this.timer);
@@ -471,10 +540,8 @@ class LoupGarou {
     if (player.isLover) {
       const otherLover = this.players.find(p => p.isLover && p.id !== player.id && p.isAlive);
       if (otherLover) {
-        this.addLog(`${otherLover.name} meurt de chagrin suite à la mort de sa moitié... Il/Elle était : ${otherLover.role}`);
-        otherLover.isAlive = false;
-        if (otherLover.isMayor) this.state.deadMayorId = otherLover.id;
-        if (otherLover.role === 'Chasseur') this.state.deadHunterId = otherLover.id;
+        this.addLog(`${otherLover.name} meurt de chagrin suite à la mort de sa moitié...`);
+        this.killPlayerSoft(otherLover.id);
       }
     }
   }
@@ -644,6 +711,7 @@ class LoupGarou {
         nightVictims: (player.role === 'Sorciere' && this.state.phase === 'sorciere') || (player.role === 'Infect Père des Loups' && this.state.phase === 'infect_pere') ? this.state.nightVictims : [],
         players: safePlayersList,
         votes: currentVotes,
+        centerCards: (this.state.phase === 'voleur' && player.role === 'Voleur') ? this.state.centerCards : [],
         logs: this.state.logs,
         timeLeft: this.state.timeLeft
       });

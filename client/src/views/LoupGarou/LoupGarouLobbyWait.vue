@@ -19,8 +19,8 @@
     <div class="role-composition-section">
       <div class="section-header">
         <h3>🎭 Composition des Rôles</h3>
-        <div class="role-counter" :class="{ 'valid': totalRoles === players.length, 'invalid': totalRoles !== players.length }">
-          {{ totalRoles }} / {{ players.length }} rôles
+        <div class="role-counter" :class="{ 'valid': totalRoles === targetRolesCount, 'invalid': totalRoles !== targetRolesCount }">
+          {{ totalRoles }} / {{ targetRolesCount }} rôles
         </div>
       </div>
 
@@ -68,12 +68,13 @@
       <p v-if="players.length < 2" class="info-msg">
         Attends au moins un autre joueur...
       </p>
-      <p v-if="totalRoles !== players.length && totalRoles > 0" class="info-msg warning-msg">
-        ⚠️ Le nombre de rôles ({{ totalRoles }}) ne correspond pas au nombre de joueurs ({{ players.length }})
+      <p v-if="totalRoles !== targetRolesCount && totalRoles > 0" class="info-msg warning-msg">
+        ⚠️ Le nombre de rôles sélectionné ({{ totalRoles }}) ne correspond pas à ce qui est attendu ({{ targetRolesCount }}).
+        <span v-if="targetRolesCount !== players.length"><br><em>Note : Le Voleur requiert 2 cartes supplémentaires.</em></span>
       </p>
       <BaseButton 
         variant="primary" 
-        :disabled="players.length < 2 || totalRoles !== players.length" 
+        :disabled="players.length < 2 || totalRoles !== targetRolesCount" 
         @click="launchGame"
       >
         LANCER LA PARTIE 🚀
@@ -126,11 +127,6 @@ const roleCategories = [
     icon: '🐺',
     roles: [
       { id: 'Loup-Garou', name: 'Loup-Garou', file: 'LoupGarou.svg' },
-      { id: 'GrandMechantLoup', name: 'Grand Méchant Loup', file: 'GrandMechantLoup.svg' },
-      { id: 'LoupGarouBlanc', name: 'Loup-Garou Blanc', file: 'LoupGarouBlanc.svg' },
-      { id: 'LoupGarouVoyant', name: 'Loup-Garou Voyant', file: 'LoupGarouVoyant.svg' },
-      { id: 'InfectPereDesLoups', name: 'Infect Père des Loups', file: 'InfectPereDesLoups.svg' },
-      { id: 'ChienLoup', name: 'Chien-Loup', file: 'ChienLoup.svg' },
     ]
   },
   {
@@ -142,45 +138,14 @@ const roleCategories = [
       { id: 'Sorciere', name: 'Sorcière', file: 'Sociere.svg' },
       { id: 'Chasseur', name: 'Chasseur', file: 'Chasseur.svg' },
       { id: 'Cupidon', name: 'Cupidon', file: 'Cupidon.svg' },
-      { id: 'Ancien', name: 'Ancien', file: 'Ancien.svg' },
-      { id: 'Salvateur', name: 'Salvateur', file: 'Salvateur.svg' },
-      { id: 'IdiotDuVillage', name: 'Idiot du Village', file: 'IdiotDuVillage.svg' },
       { id: 'Petite Fille', name: 'Petite Fille', file: 'PetiteFille.svg' },
-      { id: 'MontreurDOurs', name: "Montreur d'Ours", file: 'MontreurDOurs.svg' },
-      { id: 'ServanteDevouee', name: 'Servante Dévouée', file: 'ServanteDevouee.svg' },
-      { id: 'Renard', name: 'Renard', file: 'Renard.svg' },
-      { id: 'BoucEmissaire', name: 'Bouc Émissaire', file: 'BoucEmissaire.svg' },
-      { id: 'GardeChampetre', name: 'Garde Champêtre', file: 'GardeChampetre.svg' },
-      { id: 'JugeBegue', name: 'Juge Bègue', file: 'JugeBegue.svg' },
-      { id: 'Corbeau', name: 'Corbeau', file: 'Corbeau.svg' },
-      { id: 'LapinBlanc', name: 'Lapin Blanc', file: 'LapinBlanc.svg' },
-      { id: 'Noctambule', name: 'Noctambule', file: 'Noctambule.svg' },
-      { id: 'Maire', name: 'Maire', file: 'Maire.svg' },
-    ]
-  },
-  {
-    name: 'Solitaires',
-    icon: '🃏',
-    roles: [
-      { id: 'Ange', name: 'Ange', file: 'Ange.svg' },
-      { id: 'JoueurDeFlute', name: 'Joueur de Flûte', file: 'JoueurDeFlute.svg' },
-      { id: 'Pyromane', name: 'Pyromane', file: 'Pyromane.svg' },
-      { id: 'Marionnettiste', name: 'Marionnettiste', file: 'Marionnettiste.svg' },
-      { id: 'Necromancien', name: 'Nécromancien', file: 'Nécromancien.svg' },
-      { id: 'AbominableSectaire', name: 'Abominable Sectaire', file: 'AbominableSectaire.svg' },
-      { id: 'Ankou', name: 'Ankou', file: 'Ankou.svg' },
     ]
   },
   {
     name: 'Spéciaux',
     icon: '✨',
     roles: [
-      { id: 'EnfantSauvage', name: 'Enfant Sauvage', file: 'EnfantSauvage.svg' },
-      { id: 'Comedien', name: 'Comédien', file: 'Comedien.svg' },
-      { id: 'Gitane', name: 'Gitane', file: 'Gitane.svg' },
       { id: 'Voleur', name: 'Voleur', file: 'Voleur.svg' },
-      { id: 'Soeurs', name: 'Sœurs', file: 'Soeurs.svg' },
-      { id: 'Triples', name: 'Triplés', file: 'Triples.svg' },
     ]
   }
 ];
@@ -225,6 +190,10 @@ const totalRoles = computed(() => {
 const getRoleCount = (roleId) => {
   return localComposition.value[roleId] || 0;
 };
+
+const targetRolesCount = computed(() => {
+  return props.players.length + (getRoleCount('Voleur') > 0 ? 2 : 0);
+});
 
 const getRoleDisplayName = (roleId) => {
   for (const cat of roleCategories) {

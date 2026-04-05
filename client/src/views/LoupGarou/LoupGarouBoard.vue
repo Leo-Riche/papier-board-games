@@ -31,6 +31,7 @@
       :nightVictims="gameState.nightVictims"
       :players="gameState.players"
       :votes="gameState.votes"
+      :centerCards="gameState.centerCards"
       :logs="gameState.logs"
       :timeLeft="gameState.timeLeft"
       @action="handleGameAction"
@@ -93,6 +94,7 @@
           :nightVictims="gameState.nightVictims"
           :players="gameState.players"
           :votes="gameState.votes"
+          :centerCards="gameState.centerCards"
           :logs="gameState.logs"
           :timeLeft="gameState.timeLeft"
         />
@@ -132,6 +134,7 @@ const gameState = ref({
   nightVictims: [],
   players: [],
   votes: {},
+  centerCards: [],
   logs: [],
   timeLeft: 0
 })
