@@ -25,13 +25,23 @@
 </template>
 
 <style scoped>
-.home-container { text-align: center; padding: 40px; color: white; }
-.games-grid { display: flex; gap: 20px; justify-content: center; margin-top: 40px; }
+.home-container { text-align: center; padding: 40px 20px; color: white; }
+.games-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 40px; }
 .game-card { 
-  background: #2c3e50; border-radius: 15px; padding: 20px; width: 300px;
+  background: #2c3e50; border-radius: 15px; padding: 20px; width: 300px; max-width: 100%;
   transition: transform 0.3s; cursor: pointer; border: 2px solid transparent;
+  position: relative; box-sizing: border-box;
 }
 .game-card:hover { transform: translateY(-10px); border-color: #f39c12; }
+.badge { position: absolute; top: -10px; right: -10px; background: #e74c3c; color: white; padding: 5px 10px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 .disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-play { background: #f39c12; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.btn-play { background: #f39c12; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background 0.3s; margin-top: 15px; }
+.btn-play:hover { background: #d68910; }
+
+@media (max-width: 600px) {
+  .home-container { padding: 20px 10px; }
+  h1 { font-size: 1.8rem; }
+  .games-grid { flex-direction: column; align-items: center; gap: 30px; }
+  .game-card { width: 100%; max-width: 350px; }
+}
 </style>

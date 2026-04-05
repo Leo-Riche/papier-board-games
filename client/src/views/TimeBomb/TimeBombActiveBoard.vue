@@ -126,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import TimeBombCard from './TimeBombCard.vue'
 import GameLogChat from './GameLogChat.vue' 
 
@@ -152,6 +152,11 @@ const emit = defineEmits(['cut', 'chatSend', 'announce']);
 
 const announceDefuses = ref(0);
 const announceBomb = ref(false);
+
+watch(() => props.round, () => {
+  announceDefuses.value = 0;
+  announceBomb.value = false;
+});
 
 const hasAnnounced = computed(() => !!props.announcements[props.myName]);
 const unrevealedCardsCount = computed(() => props.myHand.filter(c => !c.isRevealed).length);
