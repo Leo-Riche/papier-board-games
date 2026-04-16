@@ -66,7 +66,8 @@ input:focus { border-bottom-color: #3498db; }
 .join-btn:disabled { background: #2c3e50; color: #7f8c8d; cursor: not-allowed; }
 
 @media (max-width: 480px) {
-  .join-box { padding: 30px 20px; border-radius: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; border: none; }
+  .join-wrapper { padding: 20px; }
+  .join-box { padding: 30px 20px; border-radius: 15px; }
   h1 { font-size: 2rem; }
 }
 

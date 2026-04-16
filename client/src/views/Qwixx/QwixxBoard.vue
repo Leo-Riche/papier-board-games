@@ -2,7 +2,10 @@
   <div class="qwixx-board-wrapper">
     <div v-if="gameStatus === 'waiting'" class="waiting-screen">
       <h1>En attente de la partie...</h1>
-      <p>Partage ce code avec tes amis : <strong>{{ roomCode }}</strong></p>
+      <div class="share-box">
+        <p>Partage ce code avec tes amis : <strong>{{ roomCode }}</strong></p>
+        <button class="btn-secondary" @click="copyLink">📋 Copier le lien d'invitation</button>
+      </div>
       <ul class="player-list">
         <li v-for="p in allConnectedPlayers" :key="p.id">👤 {{ p.name }}</li>
       </ul>
@@ -315,6 +318,15 @@ onMounted(() => {
 });
 
 // Actions
+const copyLink = () => {
+  const link = `${window.location.origin}/qwixx/join/${roomCode}`;
+  navigator.clipboard.writeText(link).then(() => {
+    alert("Lien d'invitation copié dans le presse-papier !");
+  }).catch(err => {
+    console.error('Failed to copy: ', err);
+  });
+}
+
 const startGame = () => socket.emit('start_qwixx', roomCode);
 
 const rollDice = () => {
@@ -356,18 +368,23 @@ const submitTurn = (takePenalty) => {
   padding: 20px;
 }
 .waiting-screen h1 { font-size: 2.5rem; color: #3498db; margin-bottom: 20px; }
-.player-list { list-style: none; padding: 0; margin: 30px 0; font-size: 1.2rem; display: flex; flex-direction: column; gap: 10px; }
+.share-box { background: #1e1e1e; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
+.share-box p { margin-bottom: 15px; font-size: 1.2rem; color: #bdc3c7; }
+.share-box strong { color: #f1c40f; font-size: 1.5rem; }
+.btn-secondary { background: #2b2b2b; color: #ecf0f1; border: 1px solid #7f8c8d; padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; cursor: pointer; transition: 0.2s; font-weight: bold; }
+.btn-secondary:hover { background: #34495e; }
+.player-list { list-style: none; padding: 0; margin: 20px 0; font-size: 1.2rem; display: flex; flex-direction: column; gap: 10px; }
 
 /* LAYOUT */
 .playing-screen { display: flex; flex-direction: column; height: 100vh; }
 .top-bar { display: flex; justify-content: space-between; align-items: center; background: #1e1e1e; padding: 15px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .main-content { display: flex; flex: 1; overflow: hidden; }
 .my-area { flex: 2; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-.opponents-sidebar { flex: 1; background: #181818; border-left: 2px solid #2b2b2b; padding: 20px; overflow-y: auto; max-width: 400px; }
+.opponents-sidebar { flex: 1; background: #181818; border-left: 2px solid #2b2b2b; padding: 20px; overflow-y: auto; min-width: 480px; max-width: 550px; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; }
 
 @media (max-width: 900px) {
   .main-content { flex-direction: column; overflow-y: visible; }
-  .my-area, .opponents-sidebar { flex: none; width: 100%; max-width: 100%; overflow-y: visible; padding: 10px; }
+  .my-area, .opponents-sidebar { flex: none; width: 100%; max-width: 100%; min-width: 0; overflow-y: visible; padding: 10px; border-left: none; border-top: 2px solid #2b2b2b; }
   .qwixx-board-wrapper { height: auto; min-height: 100vh; }
   .playing-screen { height: auto; min-height: 100vh; }
 }
@@ -379,6 +396,16 @@ const submitTurn = (takePenalty) => {
   .btn-action.giant { font-size: 1.1rem; padding: 15px 20px; }
   .action-panel { flex-direction: column; gap: 10px; }
   .btn-action.submit, .btn-action.penalty { width: 100%; min-width: 0; padding: 15px; }
+  
+  .waiting-screen h1 { font-size: 1.8rem; }
+  .share-box { padding: 15px; }
+  .share-box p { font-size: 1rem; }
+  .share-box strong { font-size: 1.3rem; display: block; margin-top: 5px; }
+  
+  .results-box { padding: 20px; }
+  .results-box h2 { font-size: 2rem; }
+  .score-line { font-size: 1rem; padding: 10px; }
+  .score-line.first { font-size: 1.2rem; }
 }
 
 /* TYPOGRAPHY */

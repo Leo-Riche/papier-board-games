@@ -129,6 +129,7 @@ const joinRoom = () => {
 .input-group input {
   width: 100%; padding: 15px; background: #2b2b2b; border: 2px solid transparent; border-radius: 10px;
   color: #ecf0f1; font-family: 'Outfit', sans-serif; font-size: 1.1rem; text-align: center; outline: none; transition: 0.3s;
+  box-sizing: border-box;
 }
 .input-group input::placeholder { color: #7f8c8d; }
 .input-group input:focus { border-color: #3498db; background: #1e1e1e; }
@@ -136,16 +137,30 @@ const joinRoom = () => {
 .action-btn { 
   width: 100%; border: none; border-radius: 10px;
   font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; padding: 15px; 
-  cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; 
+  cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px;
+  box-sizing: border-box;
 }
 .action-btn.primary { background: #3498db; color: white; }
 .action-btn.primary:hover { background: #2980b9; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4); }
 .action-btn.secondary { background: #2b2b2b; color: #bdc3c7; border: 2px solid #7f8c8d; }
 .action-btn.secondary:hover { background: #34495e; color: white; transform: translateY(-2px); border-color: #34495e;}
 
+@media (max-width: 480px) {
+  .lobby-wrapper { padding-bottom: 20px; padding-left: 10px; padding-right: 10px; }
+  .lobby-header { margin-left: -10px; margin-right: -10px; padding: 30px 10px; }
+  .investigation-desk { padding: 30px 20px; gap: 30px; }
+  .setup-form { min-width: 0; width: 100%; }
+}
+
 @media (max-width: 768px) {
   .game-title { font-size: 2.5rem; }
-  .investigation-desk { flex-direction: column; gap: 30px; padding: 30px; width: 100%; max-width: 400px; }
+  .investigation-desk { flex-direction: column; align-items: stretch; padding: 20px; gap: 40px; }
   .setup-form { min-width: 100%; }
+  
+  /* Add visual separator on mobile between forms */
+  .setup-form:first-child {
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding-bottom: 40px;
+  }
 }
 </style>

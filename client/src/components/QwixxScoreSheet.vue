@@ -194,20 +194,37 @@ const toggleCell = (color, value) => {
 .row {
   display: flex; gap: 6px; padding: 8px; border-radius: 8px; position: relative; overflow: hidden; align-items: center; justify-content: center;
 }
-.row-bg { position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.15; z-index: 0; pointer-events: none; }
+.row-bg { position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.25; z-index: 0; pointer-events: none; }
 
 .cell {
-  position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.1);
-  background: #2b2b2b; font-weight: 700; font-size: 1.2rem; cursor: pointer; transition: 0.2s;
-  display: flex; align-items: center; justify-content: center; color: #ecf0f1;
+  position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0, 0, 0, 0.4); box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  font-weight: 700; font-size: 1.2rem; cursor: pointer; transition: 0.2s;
+  display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.9);
   font-family: inherit;
 }
 
-.cell.valid { border-color: #ecf0f1; box-shadow: 0 0 10px rgba(255,255,255,0.2); animation: pulse 2s infinite; }
-.cell.valid:hover { transform: scale(1.1); background: #34495e; border-color: #3498db; }
+.cell.valid { 
+  border-color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.1);
+  box-shadow: 0 0 10px rgba(255,255,255,0.3); animation: pulse 2s infinite; 
+}
+.cell.valid:hover { transform: scale(1.1); background: rgba(255,255,255,0.2); }
 
-.cell.selected { background: #e67e22; border-color: #f39c12; color: white; transform: scale(1.1); box-shadow: 0 0 15px rgba(243, 156, 18, 0.5); }
-.cell.crossed { background: #121212; border-color: #111; color: #7f8c8d; }
+.cell.selected { 
+  background: #f1c40f; color: #121212; border-color: #f1c40f; 
+  transform: scale(1.1); box-shadow: 0 5px 15px rgba(241, 196, 15, 0.4); 
+}
+
+.cell.crossed { 
+  background: rgba(0,0,0,0.1); border-color: rgba(255,255,255,0.05); color: transparent; box-shadow: none;
+}
+.cell.crossed::before, .cell.crossed::after {
+  content: ''; position: absolute; width: 70%; height: 3px; background: rgba(255,255,255,0.8);
+  top: 50%; left: 15%; border-radius: 2px;
+}
+.cell.crossed::before { transform: translateY(-50%) rotate(45deg); }
+.cell.crossed::after { transform: translateY(-50%) rotate(-45deg); }
+
 .cell.invalid { opacity: 0.5; cursor: not-allowed; }
 
 .cell.lock { border-radius: 50%; }
@@ -231,10 +248,10 @@ const toggleCell = (color, value) => {
 }
 
 @media (max-width: 600px) {
-  .score-sheet { padding: 10px; }
-  .cell { width: 26px; height: 26px; font-size: 0.9rem; border-width: 1px; border-radius: 4px; }
-  .is-readonly .cell { width: 18px; height: 18px; font-size: 0.7rem; border-width: 1px; }
-  .row { gap: 3px; padding: 4px; border-radius: 4px;}
+  .score-sheet { padding: 10px; border-radius: 8px; }
+  .cell { width: 26px; height: 26px; font-size: 0.9rem; border-radius: 4px; }
+  .is-readonly .cell { width: 18px; height: 18px; font-size: 0.7rem; border-radius: 3px; }
+  .row { gap: 4px; padding: 6px; border-radius: 6px; }
   .player-name { font-size: 1rem; }
   .penalties-section { font-size: 0.8rem; padding: 5px 0; }
   .penalty-box { width: 22px; height: 22px; font-size: 1rem; }
