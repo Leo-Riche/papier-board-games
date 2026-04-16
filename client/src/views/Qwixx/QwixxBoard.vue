@@ -366,9 +366,19 @@ const submitTurn = (takePenalty) => {
 .opponents-sidebar { flex: 1; background: #181818; border-left: 2px solid #2b2b2b; padding: 20px; overflow-y: auto; max-width: 400px; }
 
 @media (max-width: 900px) {
-  .main-content { flex-direction: column; overflow-y: auto; }
-  .my-area, .opponents-sidebar { flex: none; width: 100%; max-width: 100%; overflow-y: visible; }
-  .top-bar { flex-direction: column; gap: 15px; }
+  .main-content { flex-direction: column; overflow-y: visible; }
+  .my-area, .opponents-sidebar { flex: none; width: 100%; max-width: 100%; overflow-y: visible; padding: 10px; }
+  .qwixx-board-wrapper { height: auto; min-height: 100vh; }
+  .playing-screen { height: auto; min-height: 100vh; }
+}
+
+@media (max-width: 600px) {
+  .top-bar { flex-direction: column; gap: 15px; padding: 15px; }
+  .dice-area { gap: 8px; padding: 10px; justify-content: center; flex-wrap: wrap;}
+  .die { width: 40px; height: 40px; font-size: 1.5rem; }
+  .btn-action.giant { font-size: 1.1rem; padding: 15px 20px; }
+  .action-panel { flex-direction: column; gap: 10px; }
+  .btn-action.submit, .btn-action.penalty { width: 100%; min-width: 0; padding: 15px; }
 }
 
 /* TYPOGRAPHY */

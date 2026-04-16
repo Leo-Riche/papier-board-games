@@ -177,18 +177,19 @@ const toggleCell = (color, value) => {
 .score-sheet {
   background: #1e1e1e; border-radius: 10px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
   margin-bottom: 20px; font-family: 'Outfit', sans-serif;
-  max-width: 650px; margin: 0 auto 20px auto;
+  max-width: 100%; margin: 0 auto 20px auto;
   border: 1px solid rgba(255,255,255,0.05);
+  overflow-x: auto;
 }
 
-.is-readonly { opacity: 0.9; scale: 0.95; box-shadow: none; border: 1px solid #2b2b2b; max-width: 500px; padding: 10px; }
+.is-readonly { opacity: 0.9; scale: 0.95; box-shadow: none; border: 1px solid #2b2b2b; max-width: 100%; padding: 10px; }
 .is-readonly .cell { pointer-events: none; }
 .is-readonly .row { gap: 4px; padding: 6px; }
 .is-readonly .cell { width: 30px; height: 30px; font-size: 1rem; }
 
-.player-name { font-size: 1.2rem; font-weight: 700; color: #ecf0f1; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.player-name { font-size: 1.2rem; font-weight: 700; color: #ecf0f1; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; position: sticky; left: 0; }
 
-.score-grid { display: flex; flex-direction: column; gap: 8px; }
+.score-grid { display: flex; flex-direction: column; gap: 8px; min-width: fit-content; }
 
 .row {
   display: flex; gap: 6px; padding: 8px; border-radius: 8px; position: relative; overflow: hidden; align-items: center; justify-content: center;
@@ -230,8 +231,12 @@ const toggleCell = (color, value) => {
 }
 
 @media (max-width: 600px) {
-  .cell { width: 32px; height: 32px; font-size: 1rem; border-width: 1px;}
-  .is-readonly .cell { width: 22px; height: 22px; font-size: 0.8rem; }
-  .row { gap: 3px; padding: 5px; }
+  .score-sheet { padding: 10px; }
+  .cell { width: 26px; height: 26px; font-size: 0.9rem; border-width: 1px; border-radius: 4px; }
+  .is-readonly .cell { width: 18px; height: 18px; font-size: 0.7rem; border-width: 1px; }
+  .row { gap: 3px; padding: 4px; border-radius: 4px;}
+  .player-name { font-size: 1rem; }
+  .penalties-section { font-size: 0.8rem; padding: 5px 0; }
+  .penalty-box { width: 22px; height: 22px; font-size: 1rem; }
 }
 </style>
