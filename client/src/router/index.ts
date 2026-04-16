@@ -11,6 +11,10 @@ import LoupGarouLobby from '../views/LoupGarou/LoupGarouLobby.vue'
 import LoupGarouBoard from '../views/LoupGarou/LoupGarouBoard.vue'
 import LoupGarouJoin from '../views/LoupGarou/LoupGarouJoin.vue'
 
+import QwixxLobby from '../views/Qwixx/QwixxLobby.vue'
+import QwixxBoard from '../views/Qwixx/QwixxBoard.vue'
+import QwixxJoin from '../views/Qwixx/QwixxJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -48,6 +52,22 @@ const routes = [
     path: '/loupgarou/join/:id',
     name: 'LoupGarouJoin',
     component: LoupGarouJoin,
+    props: true
+  },
+  {
+    path: '/qwixx/lobby',
+    name: 'QwixxLobby',
+    component: QwixxLobby
+  },
+  {
+    path: '/qwixx/game/:id',
+    name: 'QwixxBoard',
+    component: QwixxBoard
+  },
+  {
+    path: '/qwixx/join/:id',
+    name: 'QwixxJoin',
+    component: QwixxJoin,
     props: true
   },
 ]

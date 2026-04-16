@@ -5,6 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const TimeBomb = require('./games/timebomb');
 const LoupGarou = require('./games/loupgarou');
+const Qwixx = require('./games/qwixx');
 
 const app = express();
 app.use(cors());
@@ -150,6 +151,34 @@ io.on('connection', (socket) => {
     const game = activeGames[cleanRoomCode];
     if (game && game instanceof LoupGarou) {
       game.handleAction(socket.id, actionType, targetId);
+    }
+  });
+
+  socket.on('start_qwixx', (roomCode) => {
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+    
+    const playersData = clients.map(id => {
+        const s = io.sockets.sockets.get(id);
+        return { id: id, name: s.playerName || "Anonyme" };
+    });
+
+    const game = new Qwixx(cleanRoomCode, playersData, io);
+    activeGames[cleanRoomCode] = game;
+    
+    game.start();
+  });
+
+  socket.on('qwixx_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof Qwixx) {
+      game.handleAction(socket.id, actionType, payload);
     }
   });
 
