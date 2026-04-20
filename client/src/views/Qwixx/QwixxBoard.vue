@@ -9,7 +9,7 @@
       <ul class="player-list">
         <li v-for="p in allConnectedPlayers" :key="p.id">👤 {{ p.name }}</li>
       </ul>
-      <button v-if="amIHost" class="btn-primary" @click="startGame" :disabled="allConnectedPlayers.length < 2">
+      <button v-if="amIHost" class="btn-primary" @click="startGame">
         LANCER LA PARTIE
       </button>
       <p v-else>En attente du chef de salle...</p>
