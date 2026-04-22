@@ -35,10 +35,6 @@
           <div class="die g" :class="{ 'die-roll': animatingDice, hidden: dice.green === 0 }">{{ dice.green !== 0 ? dice.green : '' }}</div>
           <div class="die b" :class="{ 'die-roll': animatingDice, hidden: dice.blue === 0 }">{{ dice.blue !== 0 ? dice.blue : '' }}</div>
         </div>
-        <div class="dice-area" v-else>
-           <button v-if="isActivePlayer" class="btn-action giant" @click="rollDice">TIRER LES DÉS 🎲</button>
-           <p v-else>En attente du lancer de dés...</p>
-        </div>
       </div>
 
       <div class="main-content">
@@ -52,6 +48,7 @@
             :dice="dice"
             :isActivePlayer="isActivePlayer"
             :selectedCells="selectedCells"
+            :isMainPlayer="true"
             @toggle-cell="onToggleCell"
           />
 
@@ -68,10 +65,14 @@
           <div class="action-panel status" v-else-if="phase === 'deciding' && hasSubmittedTurn">
             <p>En attente des autres joueurs...</p>
           </div>
+          <div class="action-panel" v-else>
+             <button v-if="isActivePlayer" class="btn-action giant" @click="rollDice">TIRER LES DÉS 🎲</button>
+             <p v-else style="font-size: 1.2rem; color: #bdc3c7; font-weight: 700;">En attente du lancer de dés...</p>
+          </div>
         </div>
 
         <!-- Sidebar: Opponents -->
-        <div class="opponents-sidebar">
+        <div class="opponents-sidebar" :class="{ 'multi-col': opponents.length >= 4 }">
            <h3>Adversaires</h3>
            <QwixxScoreSheet
               v-for="opp in opponents"
@@ -80,6 +81,7 @@
               :scoreSheet="opp.scoreSheet"
               :lockedColors="lockedColors"
               :readOnly="true"
+              :class="{ 'compact-mode': opponents.length >= 4 }"
            />
         </div>
       </div>
@@ -378,15 +380,26 @@ const submitTurn = (takePenalty) => {
 /* LAYOUT */
 .playing-screen { display: flex; flex-direction: column; height: 100vh; }
 .top-bar { display: flex; justify-content: space-between; align-items: center; background: #1e1e1e; padding: 15px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.main-content { display: flex; flex: 1; overflow: hidden; }
+.main-content { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 .my-area { flex: 2; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-.opponents-sidebar { flex: 1; background: #181818; border-left: 2px solid #2b2b2b; padding: 20px; overflow-y: auto; min-width: 480px; max-width: 550px; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; }
+.opponents-sidebar { flex: 1; background: #181818; border-left: 2px solid #2b2b2b; padding: 20px; overflow-y: auto; height: 100%; min-width: 450px; max-width: 550px; overflow-x: auto; display: flex; flex-direction: column; align-items: stretch; }
+.opponents-sidebar > h3 { align-self: center; width: 100%; }
+
+.opponents-sidebar.multi-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 15px;
+  max-width: 650px;
+}
+.opponents-sidebar.multi-col > h3 { grid-column: 1 / -1; margin-bottom: 5px; }
 
 @media (max-width: 900px) {
   .main-content { flex-direction: column; overflow-y: visible; }
   .my-area, .opponents-sidebar { flex: none; width: 100%; max-width: 100%; min-width: 0; overflow-y: visible; padding: 10px; border-left: none; border-top: 2px solid #2b2b2b; }
   .qwixx-board-wrapper { height: auto; min-height: 100vh; }
   .playing-screen { height: auto; min-height: 100vh; }
+  .opponents-sidebar.multi-col { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 600px) {
@@ -396,6 +409,7 @@ const submitTurn = (takePenalty) => {
   .btn-action.giant { font-size: 1.1rem; padding: 15px 20px; }
   .action-panel { flex-direction: column; gap: 10px; }
   .btn-action.submit, .btn-action.penalty { width: 100%; min-width: 0; padding: 15px; }
+  .opponents-sidebar.multi-col { grid-template-columns: 1fr; }
   
   .waiting-screen h1 { font-size: 1.8rem; }
   .share-box { padding: 15px; }

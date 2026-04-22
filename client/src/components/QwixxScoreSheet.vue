@@ -1,5 +1,5 @@
 <template>
-  <div class="score-sheet" :class="{ 'is-readonly': readOnly }">
+  <div class="score-sheet" :class="{ 'is-readonly': readOnly, 'is-main-player': isMainPlayer, 'is-opponent': !isMainPlayer }">
     <div class="player-name">{{ playerName }}</div>
     <div class="score-grid">
       <!-- Red Row -->
@@ -101,7 +101,8 @@ const props = defineProps({
   readOnly: Boolean,
   dice: Object, // {w1, w2, red, yellow, green, blue}
   isActivePlayer: Boolean,
-  selectedCells: Array // [{color, value, source}] (managed by parent)
+  selectedCells: Array, // [{color, value, source}] (managed by parent)
+  isMainPlayer: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['toggle-cell'])
@@ -180,12 +181,32 @@ const toggleCell = (color, value) => {
   max-width: 100%; margin: 0 auto 20px auto;
   border: 1px solid rgba(255,255,255,0.05);
   overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
 }
 
-.is-readonly { opacity: 0.9; scale: 0.95; box-shadow: none; border: 1px solid #2b2b2b; max-width: 100%; padding: 10px; }
-.is-readonly .cell { pointer-events: none; }
-.is-readonly .row { gap: 4px; padding: 6px; }
-.is-readonly .cell { width: 30px; height: 30px; font-size: 1rem; }
+/* GENERAL READONLY (Opponents generally get this if not multi-col) */
+.score-sheet.is-opponent { opacity: 0.9; box-shadow: none; border: 1px solid #2b2b2b; padding: 10px; }
+.score-sheet.is-opponent .cell { pointer-events: none; width: 30px; height: 30px; font-size: 1rem; }
+.score-sheet.is-opponent .row { gap: 4px; padding: 6px; }
+
+/* COMPACT MODE FOR OPPONENTS (4+ players grid) */
+.score-sheet.is-opponent.compact-mode { padding: 6px; border-radius: 8px; margin-bottom: 0; }
+.score-sheet.is-opponent.compact-mode .player-name { font-size: 0.85rem; margin-bottom: 4px; }
+.score-sheet.is-opponent.compact-mode .cell { width: 18px; height: 18px; font-size: 0.7rem; border-radius: 3px; }
+.score-sheet.is-opponent.compact-mode .row { gap: 2px; padding: 3px; border-radius: 6px; }
+.score-sheet.is-opponent.compact-mode .penalty-box { width: 14px; height: 14px; font-size: 0.7rem; }
+.score-sheet.is-opponent.compact-mode .penalties-section { font-size: 0.75rem; padding: 4px 0; gap: 5px; }
+
+/* MAIN PLAYER OVERRIDES */
+.score-sheet.is-main-player { padding: 25px; }
+.score-sheet.is-main-player .cell { width: 45px; height: 45px; font-size: 1.4rem; border-radius: 8px; }
+.score-sheet.is-main-player .row { gap: 8px; padding: 12px; border-radius: 10px; }
+.score-sheet.is-main-player .player-name { font-size: 1.5rem; margin-bottom: 15px; }
+
+/* Main player gets a slightly dimmed look when read-only, but keeps size! */
+.score-sheet.is-main-player.is-readonly { opacity: 0.7; }
+.score-sheet.is-main-player.is-readonly .cell { pointer-events: none; }
 
 .player-name { font-size: 1.2rem; font-weight: 700; color: #ecf0f1; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; position: sticky; left: 0; }
 
