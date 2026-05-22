@@ -15,6 +15,10 @@ import QwixxLobby from '../views/Qwixx/QwixxLobby.vue'
 import QwixxBoard from '../views/Qwixx/QwixxBoard.vue'
 import QwixxJoin from '../views/Qwixx/QwixxJoin.vue'
 
+import YamsLobby from '../views/Yams/YamsLobby.vue'
+import YamsBoard from '../views/Yams/YamsBoard.vue'
+import YamsJoin from '../views/Yams/YamsJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -68,6 +72,22 @@ const routes = [
     path: '/qwixx/join/:id',
     name: 'QwixxJoin',
     component: QwixxJoin,
+    props: true
+  },
+  {
+    path: '/yams/lobby',
+    name: 'YamsLobby',
+    component: YamsLobby
+  },
+  {
+    path: '/yams/game/:id',
+    name: 'YamsBoard',
+    component: YamsBoard
+  },
+  {
+    path: '/yams/join/:id',
+    name: 'YamsJoin',
+    component: YamsJoin,
     props: true
   },
 ]

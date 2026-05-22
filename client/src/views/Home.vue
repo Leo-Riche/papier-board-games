@@ -22,6 +22,13 @@
         <p>Prenez des risques et cochez les bonnes cases dans ce jeu de dés addictif !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
+
+      <div class="game-card" @click="$router.push('/yams/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Yams 🎲</h2>
+        <p>Lancez les dés, composez vos combinaisons et visez le Yams pour la victoire !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
     </div>
   </div>
 </template>
