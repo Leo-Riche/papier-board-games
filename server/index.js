@@ -7,6 +7,7 @@ const TimeBomb = require('./games/timebomb');
 const LoupGarou = require('./games/loupgarou');
 const Qwixx = require('./games/qwixx');
 const Yams = require('./games/yams');
+const TheGang = require('./games/thegang');
 
 const app = express();
 app.use(cors());
@@ -221,6 +222,45 @@ io.on('connection', (socket) => {
   socket.on('send_player_chat', (data) => {
     const { roomCode, text, sender } = data;
     io.to(roomCode).emit('player_chat_message', { text, sender });
+  });
+
+  // ── THE GANG ────────────────────────────────────────────────
+  socket.on('start_thegang', (roomCode) => {
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+
+    if (clients.length < 3 || clients.length > 6) {
+      return socket.emit('thegang_error', `The Gang nécessite entre 3 et 6 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    const playersData = clients.map(id => {
+      const s = io.sockets.sockets.get(id);
+      return { id, name: s.playerName || 'Anonyme' };
+    });
+
+    const game = new TheGang(cleanRoomCode, playersData, io);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('thegang_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof TheGang) {
+      switch (actionType) {
+        case 'phase_vote':        game.handlePhaseVote(socket.id); break;
+        case 'cancel_phase_vote': game.handleCancelPhaseVote(socket.id); break;
+        case 'take_token':        game.handleTakeToken(socket.id, payload.tokenNumber); break;
+        case 'release_token':     game.handleReleaseToken(socket.id); break;
+        case 'validate':          game.handleValidate(socket.id); break;
+        case 'next_heist':        game.handleNextHeist(socket.id); break;
+      }
+    }
   });
 
 });

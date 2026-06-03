@@ -19,6 +19,10 @@ import YamsLobby from '../views/Yams/YamsLobby.vue'
 import YamsBoard from '../views/Yams/YamsBoard.vue'
 import YamsJoin from '../views/Yams/YamsJoin.vue'
 
+import TheGangLobby from '../views/TheGang/TheGangLobby.vue'
+import TheGangBoard from '../views/TheGang/TheGangBoard.vue'
+import TheGangJoin from '../views/TheGang/TheGangJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -88,6 +92,23 @@ const routes = [
     path: '/yams/join/:id',
     name: 'YamsJoin',
     component: YamsJoin,
+    props: true
+  },
+  {
+    path: '/thegang/lobby',
+    name: 'TheGangLobby',
+    component: TheGangLobby
+  },
+  {
+    path: '/thegang/game/:id',
+    name: 'TheGangBoard',
+    component: TheGangBoard,
+    props: true
+  },
+  {
+    path: '/thegang/join/:id',
+    name: 'TheGangJoin',
+    component: TheGangJoin,
     props: true
   },
 ]
