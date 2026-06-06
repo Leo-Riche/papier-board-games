@@ -7,6 +7,7 @@ const TimeBomb = require('./games/timebomb');
 const LoupGarou = require('./games/loupgarou');
 const Qwixx = require('./games/qwixx');
 const Yams = require('./games/yams');
+const Charger = require('./games/charger');
 
 const app = express();
 app.use(cors());
@@ -207,6 +208,37 @@ io.on('connection', (socket) => {
     const cleanRoomCode = roomCode.trim();
     const game = activeGames[cleanRoomCode];
     if (game && game instanceof Yams) {
+      game.handleAction(socket.id, actionType, payload);
+    }
+  });
+
+  socket.on('start_charger', (roomCode) => {
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+
+    if (clients.length < 2) {
+      return socket.emit('action_log', '⚠️ Il faut au moins 2 joueurs pour lancer la partie !');
+    }
+
+    const playersData = clients.map(id => {
+      const s = io.sockets.sockets.get(id);
+      return { id: id, name: s.playerName || 'Anonyme' };
+    });
+
+    const game = new Charger(cleanRoomCode, playersData, io);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('charger_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof Charger) {
       game.handleAction(socket.id, actionType, payload);
     }
   });

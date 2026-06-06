@@ -19,6 +19,10 @@ import YamsLobby from '../views/Yams/YamsLobby.vue'
 import YamsBoard from '../views/Yams/YamsBoard.vue'
 import YamsJoin from '../views/Yams/YamsJoin.vue'
 
+import ChargerLobby from '../views/Charger/ChargerLobby.vue'
+import ChargerBoard from '../views/Charger/ChargerBoard.vue'
+import ChargerJoin from '../views/Charger/ChargerJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -88,6 +92,22 @@ const routes = [
     path: '/yams/join/:id',
     name: 'YamsJoin',
     component: YamsJoin,
+    props: true
+  },
+  {
+    path: '/charger/lobby',
+    name: 'ChargerLobby',
+    component: ChargerLobby
+  },
+  {
+    path: '/charger/game/:id',
+    name: 'ChargerBoard',
+    component: ChargerBoard
+  },
+  {
+    path: '/charger/join/:id',
+    name: 'ChargerJoin',
+    component: ChargerJoin,
     props: true
   },
 ]
