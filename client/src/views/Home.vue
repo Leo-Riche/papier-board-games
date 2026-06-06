@@ -33,6 +33,12 @@
         <p>Coopératif & silencieux : classez vos mains de poker sans parler et réussissez 3 braquages !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
+      
+      <div class="game-card" @click="$router.push('/charger/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Chargeeer 🛡️</h2>
+        <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
+      </div>
     </div>
   </div>
 </template>

@@ -23,6 +23,10 @@ import TheGangLobby from '../views/TheGang/TheGangLobby.vue'
 import TheGangBoard from '../views/TheGang/TheGangBoard.vue'
 import TheGangJoin from '../views/TheGang/TheGangJoin.vue'
 
+import ChargerLobby from '../views/Charger/ChargerLobby.vue'
+import ChargerBoard from '../views/Charger/ChargerBoard.vue'
+import ChargerJoin from '../views/Charger/ChargerJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -109,6 +113,22 @@ const routes = [
     path: '/thegang/join/:id',
     name: 'TheGangJoin',
     component: TheGangJoin,
+    props: true
+  },
+  {
+    path: '/charger/lobby',
+    name: 'ChargerLobby',
+    component: ChargerLobby
+  },
+  {
+    path: '/charger/game/:id',
+    name: 'ChargerBoard',
+    component: ChargerBoard
+  },
+  {
+    path: '/charger/join/:id',
+    name: 'ChargerJoin',
+    component: ChargerJoin,
     props: true
   },
 ]
