@@ -38,6 +38,7 @@
         <div class="badge">Nouveau !</div>
         <h2>Chargeeer 🛡️</h2>
         <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
+        <button class="btn-play">Jouer maintenant</button>
       </div>
     </div>
   </div>
