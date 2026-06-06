@@ -3,21 +3,18 @@
     <h1>Papier Board Games 🎲</h1>
     <div class="games-grid">
       <div class="game-card" @click="$router.push('/timebomb/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Time Bomb 💣</h2>
         <p>Bluffez vos amis pour sauver Londres... ou la faire sauter !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
       <div class="game-card" @click="$router.push('/loupgarou/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Loup Garou 🐺</h2>
         <p>Participez à une partie de Loup-Garou et tentez de découvrir les rôles des autres joueurs !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
       <div class="game-card" @click="$router.push('/qwixx/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Qwixx 🎲</h2>
         <p>Prenez des risques et cochez les bonnes cases dans ce jeu de dés addictif !</p>
         <button class="btn-play">Jouer maintenant</button>
@@ -30,11 +27,17 @@
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
-    <div class="game-card" @click="$router.push('/charger/lobby')">
+      <div class="game-card" @click="$router.push('/thegang/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>The Gang 🔫</h2>
+        <p>Coopératif & silencieux : classez vos mains de poker sans parler et réussissez 3 braquages !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
+      
+      <div class="game-card" @click="$router.push('/charger/lobby')">
         <div class="badge">Nouveau !</div>
         <h2>Chargeeer 🛡️</h2>
         <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
-        <button class="btn-play">Jouer maintenant</button>
       </div>
     </div>
   </div>
