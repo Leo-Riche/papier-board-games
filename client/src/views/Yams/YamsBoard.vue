@@ -78,9 +78,9 @@
                 <span class="opp-name">{{ opp.name }}</span>
                 <span class="opp-score">{{ opp.totalScore }} pts</span>
                 <span v-if="opp.hasBonus" class="opp-bonus-tag">+35</span>
-                <span class="opp-expand">{{ expandedOpponent === opp.id ? '▲' : '▼' }}</span>
+                <span class="opp-expand">{{ expandedOpponents.includes(opp.id) ? '▲' : '▼' }}</span>
               </div>
-              <div v-if="expandedOpponent === opp.id" class="opp-detail" @click.stop>
+              <div v-if="expandedOpponents.includes(opp.id)" class="opp-detail" @click.stop>
                 <div class="opp-detail-grid">
                   <div class="opp-col">
                     <div v-for="cat in upperCategories" :key="cat.key" class="opp-cat" :class="{ scored: opp.scoreSheet[cat.key] !== null }">
@@ -236,7 +236,7 @@ const activePlayerId = ref(null)
 const myId = ref(null)
 const gameLogs = ref([])
 const animatingDice = ref(false)
-const expandedOpponent = ref(null)
+const expandedOpponents = ref([])
 
 // End Game
 const winReason = ref('')
@@ -366,7 +366,12 @@ function toggleLock(index) {
 }
 
 function toggleOpponentDetail(oppId) {
-  expandedOpponent.value = expandedOpponent.value === oppId ? null : oppId;
+  const index = expandedOpponents.value.indexOf(oppId);
+  if (index > -1) {
+    expandedOpponents.value.splice(index, 1);
+  } else {
+    expandedOpponents.value.push(oppId);
+  }
 }
 
 function rollDice() {
