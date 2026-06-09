@@ -96,7 +96,8 @@
               </div>
             </div>
 
-            <button class="btn-primary" @click="handleNextHeist">🔫 Prochain braquage</button>
+            <button v-if="amIHost" class="btn-primary" @click="handleNextHeist">🔫 Prochain braquage</button>
+            <p v-else class="waiting-msg-overlay">En attente du chef de salle...</p>
           </div>
         </div>
       </Transition>
@@ -124,7 +125,33 @@
             <span v-for="i in 3" :key="i" :class="i <= alarms ? 'alarm-on' : 'alarm-off'">!</span>
           </span>
         </div>
+
+        <!-- Bouton aide combinaisons -->
+        <button class="btn-help" @click="showHandsModal = true" title="Aide combinaisons">❓</button>
       </div>
+
+      <!-- MODAL AIDE COMBINAISONS -->
+      <Transition name="modal-fade">
+        <div v-if="showHandsModal" class="hands-modal-overlay" @click.self="showHandsModal = false">
+          <div class="hands-modal">
+            <div class="hands-modal-header">
+              <span class="hands-modal-title">🃏 PUISSANCE DES COMBINAISONS</span>
+              <button class="hands-modal-close" @click="showHandsModal = false">✕</button>
+            </div>
+            <div class="hands-list">
+              <div v-for="hand in HAND_RANKINGS" :key="hand.rank" class="hand-row">
+                <div class="hand-rank-badge">{{ hand.rank }}</div>
+                <div class="hand-info">
+                  <span class="hand-name">{{ hand.name }}</span>
+                  <span class="hand-desc">{{ hand.desc }}</span>
+                </div>
+                <div class="hand-example">{{ hand.example }}</div>
+              </div>
+            </div>
+            <p class="hands-modal-note">📍 Jeton 1 = main la plus faible · Jeton N = main la plus forte</p>
+          </div>
+        </div>
+      </Transition>
 
       <!-- MAIN CONTENT: left panel + right panel -->
       <div class="main-content">
@@ -272,7 +299,7 @@
                 @click="handleTokenClick(n)"
                 :title="getTokenTitle(n)"
               >
-                <TokenChip :count="n" :size="72" />
+                <TokenChip :count="n" :size="72" :phase="phase" />
                 <div class="token-owner-label">{{ getTokenOwnerLabel(n) }}</div>
               </div>
             </div>
@@ -290,12 +317,61 @@
               <span class="panel-title">JOUEURS</span>
             </div>
             <div class="opponents-list">
+
+              <!-- Adversaires -->
               <div v-for="opp in opponents" :key="opp.id" class="opp-card">
-                <span class="opp-name">{{ opp.name }}</span>
-                <span class="opp-token-badge" :class="{ 'has-token': opp.tokenNumber !== null }">
-                  {{ opp.tokenNumber !== null ? `Jeton ${opp.tokenNumber}` : '–' }}
-                </span>
+                <div class="opp-card-top">
+                  <span class="opp-name">{{ opp.name }}</span>
+                  <span class="opp-token-badge" :class="{ 'has-token': opp.tokenNumber !== null }">
+                    {{ opp.tokenNumber !== null ? `Jeton ${opp.tokenNumber}` : '–' }}
+                  </span>
+                </div>
+                <!-- Historique phases en cours -->
+                <div v-if="currentPhaseLogMap[opp.name]" class="inline-history">
+                  <div v-for="phaseEntry in currentPhaseLogMap[opp.name]" :key="phaseEntry.phase" class="inline-history-round">
+                    <span class="inline-round-num" :class="phaseEntry.phase">{{ PHASE_LABELS[phaseEntry.phase] }}</span>
+                    <div class="inline-token-row">
+                      <span
+                        v-for="(tkn, ti) in phaseEntry.tokens"
+                        :key="ti"
+                        class="inline-token-mini"
+                        :class="phaseEntry.phase"
+                      >
+                        <span v-if="ti > 0" class="inline-arrow">→</span>
+                        {{ tkn }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              <!-- MOI -->
+              <div class="opp-card opp-card-me">
+                <div class="opp-card-top">
+                  <span class="opp-name">Moi <span class="me-star">⭐</span></span>
+                  <span class="opp-token-badge" :class="{ 'has-token': myTokenNumber !== null }">
+                    {{ myTokenNumber !== null ? `Jeton ${myTokenNumber}` : '–' }}
+                  </span>
+                </div>
+                <!-- Historique phases en cours -->
+                <div v-if="currentPhaseLogMap[myName]" class="inline-history">
+                  <div v-for="phaseEntry in currentPhaseLogMap[myName]" :key="phaseEntry.phase" class="inline-history-round">
+                    <span class="inline-round-num" :class="phaseEntry.phase">{{ PHASE_LABELS[phaseEntry.phase] }}</span>
+                    <div class="inline-token-row">
+                      <span
+                        v-for="(tkn, ti) in phaseEntry.tokens"
+                        :key="ti"
+                        class="inline-token-mini"
+                        :class="phaseEntry.phase"
+                      >
+                        <span v-if="ti > 0" class="inline-arrow">→</span>
+                        {{ tkn }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -404,12 +480,38 @@ const allHaveTokens = ref(false)
 const showdownResult = ref(null)
 const gameOverData = ref(null)
 const gameLogs = ref([])
+const tokenHistory = ref([])
+const showHandsModal = ref(false)
+const currentHeistLog = ref([])
+
+// ── Hand rankings reference ────────────────────
+const HAND_RANKINGS = [
+  { rank: 10, name: 'Quinte Flush Royale', desc: 'A K Q J 10 de la même couleur', example: '🂡🂾🂽🂼🂻' },
+  { rank: 9,  name: 'Quinte Flush',        desc: '5 cartes consécutives de la même couleur', example: '🂢🂣🂤🂥🂦' },
+  { rank: 8,  name: 'Carré',               desc: '4 cartes de même valeur', example: '🂡🂱🂽🃁 + 1' },
+  { rank: 7,  name: 'Full House',          desc: 'Un brelan + une paire', example: 'KKK + QQ' },
+  { rank: 6,  name: 'Couleur (Flush)',     desc: '5 cartes de la même couleur', example: '🂡🂾🂺🂸🂶' },
+  { rank: 5,  name: 'Suite (Straight)',    desc: '5 cartes consécutives', example: '5 6 7 8 9' },
+  { rank: 4,  name: 'Brelan',             desc: '3 cartes de même valeur', example: 'JJJ + 2 + 5' },
+  { rank: 3,  name: 'Double Paire',       desc: '2 paires différentes', example: 'QQ + 88 + K' },
+  { rank: 2,  name: 'Paire',              desc: '2 cartes de même valeur', example: '77 + A + K + 3' },
+  { rank: 1,  name: 'Carte Haute',        desc: 'Aucune combinaison', example: 'A + K + J + 8 + 3' },
+]
 
 // ── Computed ───────────────────────────────────
 const isPhasePassedOrActive = (ph) => PHASES.indexOf(phase.value) >= PHASES.indexOf(ph)
 const nextPhase = computed(() => {
   const idx = PHASES.indexOf(phase.value)
   return idx < PHASES.length - 1 ? PHASES[idx + 1] : null
+})
+
+// Map playerName -> [{phase, tokens}] for the current heist (live)
+const currentPhaseLogMap = computed(() => {
+  const map = {}
+  for (const player of currentHeistLog.value) {
+    map[player.name] = player.phases
+  }
+  return map
 })
 
 // Which community card slots are "upcoming" (will be revealed this phase)
@@ -482,6 +584,7 @@ onMounted(() => {
     gameLogs.value = []
     gameOverData.value = null
     showdownResult.value = null
+    currentHeistLog.value = []
   })
 
   socket.on('update_board_state', (data) => {
@@ -494,6 +597,7 @@ onMounted(() => {
     myTokenNumber.value = data.myTokenNumber
     myHasValidated.value = data.myHasValidated
     myHasPhaseVoted.value = data.myHasPhaseVoted
+    if (data.isHost !== undefined) amIHost.value = data.isHost
     opponents.value = data.opponents
     takenTokens.value = data.takenTokens
     totalTokens.value = data.totalTokens
@@ -501,6 +605,8 @@ onMounted(() => {
     phaseVoteCount.value = data.phaseVoteCount
     allHaveTokens.value = data.allHaveTokens
     showdownResult.value = data.showdownResult
+    if (data.tokenHistory) tokenHistory.value = data.tokenHistory
+    if (data.currentHeistLog) currentHeistLog.value = data.currentHeistLog
   })
 
   socket.on('action_log', (msg) => {
@@ -1184,12 +1290,17 @@ onMounted(() => {
 .opponents-list { display: flex; flex-direction: column; gap: 6px; }
 .opp-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 8px 12px;
   background: #180d0d;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.04);
+  gap: 6px;
+}
+.opp-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .opp-name { font-size: 0.9rem; font-weight: 600; color: #ecf0f1; }
 .opp-token-badge {
@@ -1199,8 +1310,202 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 8px;
   background: rgba(255,255,255,0.03);
+  flex-shrink: 0;
 }
 .opp-token-badge.has-token { color: #e74c3c; background: rgba(231, 76, 60, 0.1); font-weight: 700; }
+.opp-card-me {
+  border-color: rgba(231, 76, 60, 0.25);
+  background: rgba(231, 76, 60, 0.06);
+}
+.me-star { font-size: 0.75rem; }
+
+/* ── INLINE HISTORY ──────────────────────────── */
+.inline-history {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.inline-history-round {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.inline-round-num {
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  min-width: 36px;
+}
+.inline-round-num.preflop { color: #bdc3c7; }
+.inline-round-num.flop    { color: #d4a000; }
+.inline-round-num.turn    { color: #cc5500; }
+.inline-round-num.river   { color: #e74c3c; }
+.inline-token-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.inline-phase-sep {
+  color: #2a1010;
+  font-size: 0.6rem;
+  margin: 0 1px;
+}
+/* Mini jeton coloré par phase */
+.inline-token-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 900;
+  justify-content: center;
+  cursor: default;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: transform 0.15s;
+}
+.inline-token-mini:hover { transform: scale(1.2); }
+.inline-token-mini.preflop {
+  background: rgba(220,220,220,0.12);
+  border-color: rgba(200,200,200,0.5);
+  color: #d8d8d8;
+}
+.inline-token-mini.flop {
+  background: rgba(212,160,0,0.15);
+  border-color: rgba(212,160,0,0.6);
+  color: #d4a000;
+}
+.inline-token-mini.turn {
+  background: rgba(204,85,0,0.15);
+  border-color: rgba(204,85,0,0.6);
+  color: #cc5500;
+}
+.inline-token-mini.river {
+  background: rgba(192,16,16,0.15);
+  border-color: rgba(231,76,60,0.6);
+  color: #e74c3c;
+}
+.inline-arrow {
+  font-size: 0.5rem;
+  color: #3a1a1a;
+  margin: 0 0px;
+}
+
+/* ── BOUTON AIDE ─────────────────────────────── */
+.btn-help {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #bdc3c7;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+.btn-help:hover { background: rgba(231, 76, 60, 0.15); border-color: rgba(231, 76, 60, 0.4); color: #e74c3c; }
+
+/* ── MODAL AIDE COMBINAISONS ─────────────────── */
+.hands-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 20px;
+}
+.hands-modal {
+  background: #180d0d;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 16px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+.hands-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(231, 76, 60, 0.15);
+  position: sticky;
+  top: 0;
+  background: #180d0d;
+  z-index: 1;
+}
+.hands-modal-title { font-size: 0.9rem; font-weight: 900; letter-spacing: 2px; color: #e74c3c; }
+.hands-modal-close {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #7f8c8d;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: 0.15s;
+}
+.hands-modal-close:hover { border-color: #e74c3c; color: #e74c3c; }
+.hands-list { display: flex; flex-direction: column; gap: 0; }
+.hand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.15s;
+}
+.hand-row:hover { background: rgba(231, 76, 60, 0.04); }
+.hand-rank-badge {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(231, 76, 60, 0.12);
+  border: 1.5px solid rgba(231, 76, 60, 0.3);
+  color: #e74c3c;
+  font-size: 0.8rem; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.hand-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.hand-name { font-size: 0.88rem; font-weight: 700; color: #ecf0f1; }
+.hand-desc { font-size: 0.75rem; color: #7f8c8d; }
+.hand-example { font-size: 0.82rem; color: #bdc3c7; flex-shrink: 0; }
+.hands-modal-note {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+  text-align: center;
+  padding: 12px 20px;
+  margin: 0;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.modal-fade-enter-active { transition: all 0.25s ease; }
+.modal-fade-leave-active { transition: all 0.2s ease; }
+.modal-fade-enter-from { opacity: 0; }
+.modal-fade-leave-to { opacity: 0; }
+
+/* ── WAITING MSG OVERLAY ──────────────────────── */
+.waiting-msg-overlay {
+  color: #7f8c8d;
+  font-style: italic;
+  font-size: 0.9rem;
+  text-align: center;
+  margin: 4px 0 0;
+}
 
 /* ── LOG BAR ──────────────────────────────────── */
 .logs-bar {

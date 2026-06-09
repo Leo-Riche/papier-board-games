@@ -7,18 +7,18 @@
     class="token-chip-svg"
   >
     <defs>
-      <radialGradient :id="`grad-main-${count}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-main-${count}-${phase}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.highlight" />
         <stop offset="100%" :stop-color="colors.main" />
       </radialGradient>
-      <radialGradient :id="`grad-rim-${count}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-rim-${count}-${phase}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.rimHighlight" />
         <stop offset="100%" :stop-color="colors.rim" />
       </radialGradient>
-      <filter :id="`shadow-${count}`" x="-15%" y="-15%" width="130%" height="130%">
+      <filter :id="`shadow-${count}-${phase}`" x="-15%" y="-15%" width="130%" height="130%">
         <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.55)" />
       </filter>
-      <filter :id="`inner-${count}`" x="-20%" y="-20%" width="140%" height="140%">
+      <filter :id="`inner-${count}-${phase}`" x="-20%" y="-20%" width="140%" height="140%">
         <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.4)" />
       </filter>
     </defs>
@@ -27,7 +27,7 @@
     <circle cx="50" cy="52" r="47" fill="rgba(0,0,0,0.3)" />
 
     <!-- Outer rim ring -->
-    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${count})`" />
+    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${count}-${phase})`" />
 
     <!-- Rim notches (8 rectangular cuts at 45° intervals) -->
     <g v-for="i in 8" :key="`notch-${i}`">
@@ -41,7 +41,7 @@
     </g>
 
     <!-- Inner rim (second smaller ring) -->
-    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${count})`" />
+    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${count}-${phase})`" />
 
     <!-- Rim notches inner ring (smaller, 8 at same positions) -->
     <g v-for="i in 8" :key="`notch-in-${i}`">
@@ -55,7 +55,7 @@
     </g>
 
     <!-- Main body circle -->
-    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${count})`" :filter="`url(#inner-${count})`" />
+    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${count}-${phase})`" :filter="`url(#inner-${count}-${phase})`" />
 
     <!-- Stars -->
     <path
@@ -64,6 +64,7 @@
       :d="starPath(pos.x, pos.y, starSize)"
       :fill="colors.star"
     />
+
   </svg>
 </template>
 
@@ -71,70 +72,58 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  count: {         // number of stars (1–6) = token number
+  count: {         // token number (1–6)
     type: Number,
     required: true
   },
   size: {          // pixel size (width & height)
     type: Number,
     default: 72
+  },
+  phase: {         // 'preflop' | 'flop' | 'turn' | 'river'
+    type: String,
+    default: 'preflop'
   }
 })
 
-// ── Chip color palettes ─────────────────────────────────────
-// 6 clearly distinct colors: white → gold → orange → red → purple → blue
-const PALETTES = {
-  1: { // White / Silver
-    main:        '#e8e8e8',
-    highlight:   '#ffffff',
-    rim:         '#b0b0b0',
-    rimHighlight:'#d0d0d0',
-    notch:       'rgba(0,0,0,0.28)',
+// ── Chip color palettes by PHASE ─────────────────────────────────────
+// preflop = blanc/silver, flop = jaune/gold, turn = orange, river = rouge
+const PHASE_PALETTES = {
+  preflop: { // White / Silver
+    main:        '#d8d8d8',
+    highlight:   '#f5f5f5',
+    rim:         '#a0a0a0',
+    rimHighlight:'#c8c8c8',
+    notch:       'rgba(0,0,0,0.22)',
     star:        '#1a1a1a'
   },
-  2: { // Gold / Yellow
-    main:        '#e8a800',
-    highlight:   '#f5c518',
-    rim:         '#a87800',
-    rimHighlight:'#cc9400',
-    notch:       'rgba(0,0,0,0.38)',
+  flop: { // Gold / Yellow
+    main:        '#d4a000',
+    highlight:   '#f0be10',
+    rim:         '#9a7000',
+    rimHighlight:'#be8c00',
+    notch:       'rgba(0,0,0,0.35)',
     star:        '#1a1a1a'
   },
-  3: { // Orange
-    main:        '#d96400',
-    highlight:   '#f07a10',
-    rim:         '#9c4800',
-    rimHighlight:'#be5800',
+  turn: { // Orange
+    main:        '#cc5500',
+    highlight:   '#e86a10',
+    rim:         '#923c00',
+    rimHighlight:'#b04800',
     notch:       'rgba(0,0,0,0.38)',
-    star:        '#1a1a1a'
+    star:        '#fff0e8'
   },
-  4: { // Red
-    main:        '#cc1a0e',
-    highlight:   '#e63025',
-    rim:         '#8c0e06',
-    rimHighlight:'#b01208',
-    notch:       'rgba(0,0,0,0.38)',
-    star:        '#ffe8e5'
-  },
-  5: { // Purple / Violet
-    main:        '#7b2d8b',
-    highlight:   '#9b3dab',
-    rim:         '#521c5e',
-    rimHighlight:'#6a2478',
-    notch:       'rgba(0,0,0,0.40)',
-    star:        '#f0e0ff'
-  },
-  6: { // Deep Blue
-    main:        '#1a4faa',
-    highlight:   '#2a65cc',
-    rim:         '#0e3278',
-    rimHighlight:'#163e96',
+  river: { // Red
+    main:        '#c01010',
+    highlight:   '#e02828',
+    rim:         '#860808',
+    rimHighlight:'#a81010',
     notch:       'rgba(0,0,0,0.42)',
-    star:        '#dceeff'
+    star:        '#ffe8e5'
   }
 }
 
-const colors = computed(() => PALETTES[Math.max(1, Math.min(6, props.count))])
+const colors = computed(() => PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['preflop'])
 
 // ── Star size scales with fewer stars ─────────────────────
 const starSize = computed(() => {
@@ -143,7 +132,6 @@ const starSize = computed(() => {
 })
 
 // ── Star positions for each count ──────────────────────────
-// Coordinate system: chip center = (50, 50), inner play area radius ≈ 24
 const STAR_POSITIONS = {
   1: [
     { x: 50, y: 50 }

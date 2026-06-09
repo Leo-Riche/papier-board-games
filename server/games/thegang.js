@@ -145,6 +145,7 @@ class TheGang {
     this.roomCode = roomCode;
     this.io = io;
     this.players = playersData;
+    this.hostId = playersData[0]?.id || null;
 
     this.state = {
       status: 'playing',
@@ -156,13 +157,16 @@ class TheGang {
       validations: new Set(),  // river validation votes
       phaseVotes: new Set(),   // votes to advance to next phase
       showdownResult: null,
-      players: []
+      players: [],
+      tokenHistory: [],        // [{round, playerTokenHistory}] - completed rounds
+      phaseLog: {}             // {playerName: {phase: [tokenNumbers]}} - current heist
     };
   }
 
   start() {
     this.state.heists = 0;
     this.state.alarms = 0;
+    this.state.tokenHistory = [];
     this.startNewHeist(true);
   }
 
@@ -188,6 +192,7 @@ class TheGang {
     this.state.phaseVotes = new Set();
     this.state.status = 'playing';
     this.state.showdownResult = null;
+    this.state.phaseLog = {}; // Reset live phase log for this new heist
 
     if (isFirstStart) {
       this.io.to(this.roomCode).emit('game_started');
@@ -264,6 +269,13 @@ class TheGang {
     // Assign token
     player.tokenNumber = tokenNumber;
 
+    // Update live phaseLog for this heist: persist across phase changes
+    const name = player.name;
+    const ph = this.state.phase;
+    if (!this.state.phaseLog[name]) this.state.phaseLog[name] = {};
+    if (!this.state.phaseLog[name][ph]) this.state.phaseLog[name][ph] = [];
+    this.state.phaseLog[name][ph].push(tokenNumber);
+
     // Reset river validations AND phase votes when tokens change
     this.state.validations = new Set();
     this.state.phaseVotes = new Set();
@@ -327,6 +339,24 @@ class TheGang {
       this.io.to(this.roomCode).emit('action_log', `🚨 ALARME DÉCLENCHÉE ! Alarmes : ${this.state.alarms}/3`);
     }
 
+    // Build per-player token history from the persisted phaseLog
+    const roundNumber = this.state.heists + this.state.alarms;
+    const PHASES_ORDER = ['preflop', 'flop', 'turn', 'river'];
+
+    const playerTokenHistory = Object.entries(this.state.phaseLog || {}).map(([name, phases]) => ({
+      name,
+      phases: PHASES_ORDER
+        .filter(ph => phases[ph] && phases[ph].length > 0)
+        .map(ph => ({ phase: ph, tokens: phases[ph] }))
+    }));
+
+    this.state.tokenHistory.push({
+      round: roundNumber,
+      success,
+      playerTokenHistory
+    });
+
+
     const showdownResult = {
       success,
       heists: this.state.heists,
@@ -364,6 +394,8 @@ class TheGang {
 
   handleNextHeist(socketId) {
     if (this.state.status !== 'showdown') return;
+    // Only the host can trigger next heist
+    if (socketId !== this.hostId) return;
     const name = this.state.players.find(p => p.id === socketId)?.name || 'Un joueur';
     this.io.to(this.roomCode).emit('action_log', `🔫 ${name} lance le prochain braquage !`);
     this.startNewHeist(false);
@@ -379,6 +411,15 @@ class TheGang {
     for (let i = 1; i <= totalTokens; i++) {
       if (!takenTokens[i]) availableTokens.push(i);
     }
+
+    // Build currentHeistLog from the persisted phaseLog state
+    const PHASES_ORDER = ['preflop', 'flop', 'turn', 'river'];
+    const currentHeistLog = Object.entries(this.state.phaseLog || {}).map(([name, phases]) => ({
+      name,
+      phases: PHASES_ORDER
+        .filter(ph => phases[ph] && phases[ph].length > 0)
+        .map(ph => ({ phase: ph, tokens: phases[ph] }))
+    }));
 
     this.state.players.forEach(player => {
       const opponents = this.state.players
@@ -401,6 +442,7 @@ class TheGang {
         myTokenNumber: player.tokenNumber,
         myHasValidated: this.state.validations.has(player.id),
         myHasPhaseVoted: this.state.phaseVotes.has(player.id),
+        isHost: player.id === this.hostId,
         opponents,
         availableTokens,
         takenTokens,
@@ -408,7 +450,9 @@ class TheGang {
         validationCount: this.state.validations.size,
         phaseVoteCount: this.state.phaseVotes.size,
         allHaveTokens: this.state.players.every(p => p.tokenNumber !== null),
-        showdownResult: this.state.showdownResult
+        showdownResult: this.state.showdownResult,
+        currentHeistLog,
+        tokenHistory: this.state.tokenHistory
       });
     });
   }
