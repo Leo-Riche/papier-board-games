@@ -23,6 +23,23 @@
         <span v-if="allConnectedPlayers.length < 3"> — encore {{ 3 - allConnectedPlayers.length }} requis</span>
       </div>
 
+      <!-- MODE ONE SHOT -->
+      <div class="oneshot-toggle" :class="{ active: oneShotMode }">
+        <div class="oneshot-toggle-info">
+          <span class="oneshot-label">MODE ONE SHOT</span>
+          <span class="oneshot-desc">{{ oneShotMode ? '💀 Une seule erreur et c\'est fini' : 'La première alarme arrête le jeu' }}</span>
+        </div>
+        <button
+          class="oneshot-btn"
+          :class="{ on: oneShotMode }"
+          :disabled="!amIHost"
+          @click="toggleOneShotMode"
+          :title="amIHost ? '' : 'Seul le chef peut changer ce mode'"
+        >
+          <span class="oneshot-switch-knob"></span>
+        </button>
+      </div>
+
       <button v-if="amIHost" class="btn-primary"
         :disabled="allConnectedPlayers.length < 3 || allConnectedPlayers.length > 6"
         @click="startGame">
@@ -57,8 +74,20 @@
             <!-- Community cards replayed -->
             <div class="sd-section-label">CARTES COMMUNES</div>
             <div class="sd-community">
-              <img v-for="card in showdownResult.communityCards" :key="card.suit + card.value"
-                   :src="getCardUrl(card)" class="sd-comm-card" />
+              <div v-for="card in showdownResult.communityCards" :key="card.suit + card.value"
+                   class="playing-card sd-comm-card" :class="getCardSuitColor(card)">
+                <div class="card-corner top-left">
+                  <span class="card-value">{{ card.value }}</span>
+                  <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                </div>
+                <div class="card-center">
+                  <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
+                </div>
+                <div class="card-corner bottom-right">
+                  <span class="card-value">{{ card.value }}</span>
+                  <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                </div>
+              </div>
             </div>
 
             <!-- Results ordered by token -->
@@ -72,8 +101,20 @@
                     <span class="sd-hand">{{ p.handName }}</span>
                   </div>
                   <div class="sd-pocket">
-                    <img v-for="card in p.pocketCards" :key="card.suit + card.value"
-                         :src="getCardUrl(card)" class="sd-pocket-card" />
+                    <div v-for="card in p.pocketCards" :key="card.suit + card.value"
+                         class="playing-card sd-pocket-card" :class="getCardSuitColor(card)">
+                      <div class="card-corner top-left">
+                        <span class="card-value">{{ card.value }}</span>
+                        <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                      </div>
+                      <div class="card-center">
+                        <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
+                      </div>
+                      <div class="card-corner bottom-right">
+                        <span class="card-value">{{ card.value }}</span>
+                        <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div v-if="p.nextCorrect !== null" class="sd-connector" :class="p.nextCorrect ? 'ok' : 'bad'">
@@ -126,6 +167,9 @@
           </span>
         </div>
 
+        <!-- Indicateur One Shot -->
+        <div v-if="oneShotMode" class="oneshot-badge">💀 ONE SHOT</div>
+
         <!-- Bouton aide combinaisons -->
         <button class="btn-help" @click="showHandsModal = true" title="Aide combinaisons">❓</button>
       </div>
@@ -135,20 +179,57 @@
         <div v-if="showHandsModal" class="hands-modal-overlay" @click.self="showHandsModal = false">
           <div class="hands-modal">
             <div class="hands-modal-header">
-              <span class="hands-modal-title">🃏 PUISSANCE DES COMBINAISONS</span>
+              <div class="hands-modal-title-group">
+                <span class="hands-modal-icon">🃏</span>
+                <span class="hands-modal-title">PUISSANCE DES COMBINAISONS</span>
+              </div>
               <button class="hands-modal-close" @click="showHandsModal = false">✕</button>
             </div>
             <div class="hands-list">
-              <div v-for="hand in HAND_RANKINGS" :key="hand.rank" class="hand-row">
-                <div class="hand-rank-badge">{{ hand.rank }}</div>
-                <div class="hand-info">
-                  <span class="hand-name">{{ hand.name }}</span>
-                  <span class="hand-desc">{{ hand.desc }}</span>
+              <div class="hands-column">
+                <div v-for="hand in HAND_RANKINGS.slice(0, 5)" :key="hand.rank" class="hand-row" :class="getRankTierClass(hand.rank)">
+                  <div class="hand-rank-badge">{{ hand.rank }}</div>
+                  <div class="hand-info">
+                    <div class="hand-meta">
+                      <span class="hand-name">{{ hand.name }}</span>
+                      <span class="hand-tier-tag">{{ getRankTierLabel(hand.rank) }}</span>
+                    </div>
+                    <span class="hand-desc">{{ hand.desc }}</span>
+                  </div>
+                  <div class="hand-example-deck">
+                    <div v-for="(card, cardIdx) in hand.cards" :key="cardIdx" 
+                         class="hand-mini-card" 
+                         :class="[card.color, { 'is-extra': card.isExtra }]">
+                      <span class="mini-card-value">{{ card.value }}</span>
+                      <span class="mini-card-suit">{{ card.suit }}</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="hand-example">{{ hand.example }}</div>
+              </div>
+              <div class="hands-column">
+                <div v-for="hand in HAND_RANKINGS.slice(5, 10)" :key="hand.rank" class="hand-row" :class="getRankTierClass(hand.rank)">
+                  <div class="hand-rank-badge">{{ hand.rank }}</div>
+                  <div class="hand-info">
+                    <div class="hand-meta">
+                      <span class="hand-name">{{ hand.name }}</span>
+                      <span class="hand-tier-tag">{{ getRankTierLabel(hand.rank) }}</span>
+                    </div>
+                    <span class="hand-desc">{{ hand.desc }}</span>
+                  </div>
+                  <div class="hand-example-deck">
+                    <div v-for="(card, cardIdx) in hand.cards" :key="cardIdx" 
+                         class="hand-mini-card" 
+                         :class="[card.color, { 'is-extra': card.isExtra }]">
+                      <span class="mini-card-value">{{ card.value }}</span>
+                      <span class="mini-card-suit">{{ card.suit }}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <p class="hands-modal-note">📍 Jeton 1 = main la plus faible · Jeton N = main la plus forte</p>
+            <div class="hands-modal-footer">
+              <p class="hands-modal-note">📍 Jeton 1 = main la plus faible · Jeton N = main la plus forte</p>
+            </div>
           </div>
         </div>
       </Transition>
@@ -168,8 +249,20 @@
               <div class="community-cards">
                 <div v-for="i in 5" :key="i" class="comm-card-slot"
                      :class="{ revealed: !!communityCards[i-1], upcoming: isUpcoming(i) }">
-                  <img v-if="communityCards[i-1]"
-                       :src="getCardUrl(communityCards[i-1])" class="comm-card" />
+                  <div v-if="communityCards[i-1]"
+                       class="playing-card comm-card" :class="getCardSuitColor(communityCards[i-1])">
+                    <div class="card-corner top-left">
+                      <span class="card-value">{{ communityCards[i-1].value }}</span>
+                      <span class="card-suit">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
+                    </div>
+                    <div class="card-center">
+                      <span class="card-suit-large">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
+                    </div>
+                    <div class="card-corner bottom-right">
+                      <span class="card-value">{{ communityCards[i-1].value }}</span>
+                      <span class="card-suit">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
+                    </div>
+                  </div>
                   <div v-else class="comm-card-placeholder">
                     <span v-if="isUpcoming(i)">?</span>
                   </div>
@@ -198,7 +291,19 @@
               </div>
               <div class="my-cards-row">
                 <div v-for="card in myPocketCards" :key="card.suit + card.value" class="my-card-wrap">
-                  <img :src="getCardUrl(card)" class="my-pocket-card" />
+                  <div class="playing-card my-pocket-card" :class="getCardSuitColor(card)">
+                    <div class="card-corner top-left">
+                      <span class="card-value">{{ card.value }}</span>
+                      <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                    </div>
+                    <div class="card-center">
+                      <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
+                    </div>
+                    <div class="card-corner bottom-right">
+                      <span class="card-value">{{ card.value }}</span>
+                      <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -392,19 +497,39 @@
         <p class="go-reason">{{ gameOverData?.reason }}</p>
 
         <div class="go-scores">
-          <div class="go-score-item">
-            <span class="go-stars">{{ '★'.repeat(gameOverData?.heists ?? 0) }}{{ '☆'.repeat(3 - (gameOverData?.heists ?? 0)) }}</span>
-            <span>{{ gameOverData?.heists }}/3 braquages réussis</span>
-          </div>
-          <div class="go-score-item alarms">
-            <span>{{ gameOverData?.alarms }}/3 alarmes déclenchées</span>
-          </div>
+          <template v-if="gameOverData?.oneShotMode">
+            <div class="go-score-item oneshot-score">
+              <span class="go-oneshot-count">{{ gameOverData?.heists ?? 0 }}</span>
+              <span>braquage{{ (gameOverData?.heists ?? 0) !== 1 ? 's' : '' }} de suite</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="go-score-item">
+              <span class="go-stars">{{ '★'.repeat(gameOverData?.heists ?? 0) }}{{ '☆'.repeat(3 - (gameOverData?.heists ?? 0)) }}</span>
+              <span>{{ gameOverData?.heists }}/3 braquages réussis</span>
+            </div>
+            <div class="go-score-item alarms">
+              <span>{{ gameOverData?.alarms }}/3 alarmes déclenchées</span>
+            </div>
+          </template>
         </div>
 
         <div class="go-final-hands" v-if="gameOverData?.playerResults">
           <div class="go-community">
-            <img v-for="card in gameOverData.communityCards" :key="card.suit+card.value"
-                 :src="getCardUrl(card)" class="go-comm-card" />
+            <div v-for="card in gameOverData.communityCards" :key="card.suit+card.value"
+                 class="playing-card go-comm-card" :class="getCardSuitColor(card)">
+              <div class="card-corner top-left">
+                <span class="card-value">{{ card.value }}</span>
+                <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+              </div>
+              <div class="card-center">
+                <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
+              </div>
+              <div class="card-corner bottom-right">
+                <span class="card-value">{{ card.value }}</span>
+                <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+              </div>
+            </div>
           </div>
           <div v-for="(p, i) in gameOverData.playerResults" :key="i">
             <div class="go-hand-row">
@@ -414,8 +539,20 @@
                 <span class="go-hand-name">{{ p.handName }}</span>
               </div>
               <div class="go-pocket-cards">
-                <img v-for="card in p.pocketCards" :key="card.suit+card.value"
-                     :src="getCardUrl(card)" class="go-pocket-card" />
+                <div v-for="card in p.pocketCards" :key="card.suit+card.value"
+                     class="playing-card go-pocket-card" :class="getCardSuitColor(card)">
+                  <div class="card-corner top-left">
+                    <span class="card-value">{{ card.value }}</span>
+                    <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                  </div>
+                  <div class="card-center">
+                    <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
+                  </div>
+                  <div class="card-corner bottom-right">
+                    <span class="card-value">{{ card.value }}</span>
+                    <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div v-if="p.nextCorrect !== null" class="go-arrow" :class="p.nextCorrect ? 'ok' : 'bad'">
@@ -483,20 +620,167 @@ const gameLogs = ref([])
 const tokenHistory = ref([])
 const showHandsModal = ref(false)
 const currentHeistLog = ref([])
+const oneShotMode = ref(false)
 
 // ── Hand rankings reference ────────────────────
 const HAND_RANKINGS = [
-  { rank: 10, name: 'Quinte Flush Royale', desc: 'A K Q J 10 de la même couleur', example: '🂡🂾🂽🂼🂻' },
-  { rank: 9,  name: 'Quinte Flush',        desc: '5 cartes consécutives de la même couleur', example: '🂢🂣🂤🂥🂦' },
-  { rank: 8,  name: 'Carré',               desc: '4 cartes de même valeur', example: '🂡🂱🂽🃁 + 1' },
-  { rank: 7,  name: 'Full House',          desc: 'Un brelan + une paire', example: 'KKK + QQ' },
-  { rank: 6,  name: 'Couleur (Flush)',     desc: '5 cartes de la même couleur', example: '🂡🂾🂺🂸🂶' },
-  { rank: 5,  name: 'Suite (Straight)',    desc: '5 cartes consécutives', example: '5 6 7 8 9' },
-  { rank: 4,  name: 'Brelan',             desc: '3 cartes de même valeur', example: 'JJJ + 2 + 5' },
-  { rank: 3,  name: 'Double Paire',       desc: '2 paires différentes', example: 'QQ + 88 + K' },
-  { rank: 2,  name: 'Paire',              desc: '2 cartes de même valeur', example: '77 + A + K + 3' },
-  { rank: 1,  name: 'Carte Haute',        desc: 'Aucune combinaison', example: 'A + K + J + 8 + 3' },
+  {
+    rank: 10,
+    name: 'Quinte Flush Royale',
+    desc: 'A, K, Q, J, 10 de la même couleur',
+    cards: [
+      { value: 'A', suit: '♥', color: 'red' },
+      { value: 'K', suit: '♥', color: 'red' },
+      { value: 'Q', suit: '♥', color: 'red' },
+      { value: 'J', suit: '♥', color: 'red' },
+      { value: '10', suit: '♥', color: 'red' }
+    ]
+  },
+  {
+    rank: 9,
+    name: 'Quinte Flush',
+    desc: '5 cartes consécutives de la même couleur',
+    cards: [
+      { value: '9', suit: '♠', color: 'black' },
+      { value: '8', suit: '♠', color: 'black' },
+      { value: '7', suit: '♠', color: 'black' },
+      { value: '6', suit: '♠', color: 'black' },
+      { value: '5', suit: '♠', color: 'black' }
+    ]
+  },
+  {
+    rank: 8,
+    name: 'Carré',
+    desc: '4 cartes de même valeur',
+    cards: [
+      { value: '10', suit: '♠', color: 'black' },
+      { value: '10', suit: '♥', color: 'red' },
+      { value: '10', suit: '♦', color: 'red' },
+      { value: '10', suit: '♣', color: 'black' },
+      { value: 'K', suit: '♦', color: 'red', isExtra: true }
+    ]
+  },
+  {
+    rank: 7,
+    name: 'Full House',
+    desc: 'Un brelan + une paire',
+    cards: [
+      { value: 'K', suit: '♠', color: 'black' },
+      { value: 'K', suit: '♥', color: 'red' },
+      { value: 'K', suit: '♦', color: 'red' },
+      { value: 'Q', suit: '♣', color: 'black' },
+      { value: 'Q', suit: '♦', color: 'red' }
+    ]
+  },
+  {
+    rank: 6,
+    name: 'Couleur (Flush)',
+    desc: '5 cartes de la même couleur',
+    cards: [
+      { value: 'A', suit: '♦', color: 'red' },
+      { value: 'J', suit: '♦', color: 'red' },
+      { value: '8', suit: '♦', color: 'red' },
+      { value: '4', suit: '♦', color: 'red' },
+      { value: '2', suit: '♦', color: 'red' }
+    ]
+  },
+  {
+    rank: 5,
+    name: 'Suite (Straight)',
+    desc: '5 cartes consécutives',
+    cards: [
+      { value: '9', suit: '♦', color: 'red' },
+      { value: '8', suit: '♠', color: 'black' },
+      { value: '7', suit: '♣', color: 'black' },
+      { value: '6', suit: '♥', color: 'red' },
+      { value: '5', suit: '♦', color: 'red' }
+    ]
+  },
+  {
+    rank: 4,
+    name: 'Brelan',
+    desc: '3 cartes de même valeur',
+    cards: [
+      { value: 'J', suit: '♠', color: 'black' },
+      { value: 'J', suit: '♣', color: 'black' },
+      { value: 'J', suit: '♦', color: 'red' },
+      { value: 'A', suit: '♥', color: 'red', isExtra: true },
+      { value: '5', suit: '♣', color: 'black', isExtra: true }
+    ]
+  },
+  {
+    rank: 3,
+    name: 'Double Paire',
+    desc: '2 paires différentes',
+    cards: [
+      { value: 'Q', suit: '♦', color: 'red' },
+      { value: 'Q', suit: '♥', color: 'red' },
+      { value: '8', suit: '♣', color: 'black' },
+      { value: '8', suit: '♠', color: 'black' },
+      { value: 'K', suit: '♥', color: 'red', isExtra: true }
+    ]
+  },
+  {
+    rank: 2,
+    name: 'Paire',
+    desc: '2 cartes de même valeur',
+    cards: [
+      { value: '7', suit: '♠', color: 'black' },
+      { value: '7', suit: '♥', color: 'red' },
+      { value: 'A', suit: '♦', color: 'red', isExtra: true },
+      { value: 'K', suit: '♣', color: 'black', isExtra: true },
+      { value: '3', suit: '♠', color: 'black', isExtra: true }
+    ]
+  },
+  {
+    rank: 1,
+    name: 'Carte Haute',
+    desc: 'Aucune combinaison',
+    cards: [
+      { value: 'A', suit: '♠', color: 'black' },
+      { value: 'K', suit: '♦', color: 'red' },
+      { value: 'J', suit: '♣', color: 'black' },
+      { value: '8', suit: '♥', color: 'red' },
+      { value: '3', suit: '♠', color: 'black' }
+    ]
+  }
 ]
+
+const getRankTierClass = (rank) => {
+  if (rank === 10) return 'tier-legendary'
+  if (rank >= 8) return 'tier-epic'
+  if (rank >= 5) return 'tier-rare'
+  return 'tier-basic'
+}
+
+const getRankTierLabel = (rank) => {
+  if (rank === 10) return 'Légendaire'
+  if (rank >= 8) return 'Très Forte'
+  if (rank >= 5) return 'Forte'
+  return 'Basique'
+}
+
+const SUIT_SYMBOLS = {
+  hearts: '♥',
+  diamonds: '♦',
+  clubs: '♣',
+  spades: '♠'
+}
+
+const SUIT_COLORS = {
+  hearts: 'red',
+  diamonds: 'red',
+  clubs: 'black',
+  spades: 'black'
+}
+
+const getCardSuitSymbol = (card) => {
+  return SUIT_SYMBOLS[card?.suit] || card?.suit || ''
+}
+
+const getCardSuitColor = (card) => {
+  return SUIT_COLORS[card?.suit] || 'black'
+}
 
 // ── Computed ───────────────────────────────────
 const isPhasePassedOrActive = (ph) => PHASES.indexOf(phase.value) >= PHASES.indexOf(ph)
@@ -545,7 +829,12 @@ const handleTokenClick = (n) => {
 }
 
 // ── Actions ────────────────────────────────────
-const startGame = () => socket.emit('start_thegang', roomCode)
+const startGame = () => socket.emit('start_thegang', { roomCode, options: { oneShotMode: oneShotMode.value } })
+const toggleOneShotMode = () => {
+  if (!amIHost.value) return
+  oneShotMode.value = !oneShotMode.value
+  socket.emit('thegang_sync_option', { roomCode, key: 'oneShotMode', value: oneShotMode.value })
+}
 const handlePhaseVote = () => socket.emit('thegang_action', { roomCode, actionType: 'phase_vote', payload: {} })
 const handleCancelPhaseVote = () => socket.emit('thegang_action', { roomCode, actionType: 'cancel_phase_vote', payload: {} })
 const handleReleaseToken = () => socket.emit('thegang_action', { roomCode, actionType: 'release_token', payload: {} })
@@ -579,6 +868,10 @@ onMounted(() => {
 
   socket.on('name_set', (data) => { myName.value = data.name })
 
+  socket.on('thegang_option_updated', ({ key, value }) => {
+    if (key === 'oneShotMode') oneShotMode.value = value
+  })
+
   socket.on('game_started', () => {
     gameStatus.value = 'playing'
     gameLogs.value = []
@@ -607,6 +900,7 @@ onMounted(() => {
     showdownResult.value = data.showdownResult
     if (data.tokenHistory) tokenHistory.value = data.tokenHistory
     if (data.currentHeistLog) currentHeistLog.value = data.currentHeistLog
+    if (data.oneShotMode !== undefined) oneShotMode.value = data.oneShotMode
   })
 
   socket.on('action_log', (msg) => {
@@ -786,7 +1080,10 @@ onMounted(() => {
 }
 
 .sd-community { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.sd-comm-card { height: 88px; border-radius: 5px; box-shadow: 0 4px 14px rgba(0,0,0,0.6); }
+.sd-comm-card { width: 63px; height: 88px; border-radius: 5px; box-shadow: 0 4px 14px rgba(0,0,0,0.6); }
+.sd-comm-card .card-suit-large { font-size: 1.7em; }
+
+
 
 .sd-results { display: flex; flex-direction: column; }
 
@@ -817,7 +1114,10 @@ onMounted(() => {
 .sd-hand { font-size: 0.82rem; color: #bdc3c7; }
 
 .sd-pocket { display: flex; gap: 5px; }
-.sd-pocket-card { height: 60px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+.sd-pocket-card { width: 43px; height: 60px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+.sd-pocket-card .card-suit-large { font-size: 1.3em; }
+.sd-pocket-card .card-value      { font-size: 0.7em; }
+.sd-pocket-card .card-suit       { font-size: 0.58em; }
 
 .sd-connector {
   display: flex;
@@ -957,6 +1257,37 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+/* ── PLAYING CARDS (shared base style) ──────── */
+.playing-card {
+  background: #ffffff;
+  border: 1.5px solid #dcdde1;
+  border-radius: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.playing-card.red   { color: #e74c3c; }
+.playing-card.black { color: #1e272e; }
+
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  gap: 1px;
+}
+.card-corner.top-left     { top: 5%; left: 10%; }
+.card-corner.bottom-right { bottom: 5%; right: 10%; transform: rotate(180deg); }
+
+.card-value      { font-size: 1.05em; font-weight: 900; line-height: 1; }
+.card-suit       { font-size: 0.9em;  line-height: 1; }
+.card-suit-large { font-size: 2.5em;  line-height: 1; }
+
 /* Community Cards — big and central */
 .community-cards {
   display: flex;
@@ -1053,10 +1384,10 @@ onMounted(() => {
 .my-card-wrap:hover { transform: translateY(-6px) scale(1.03); }
 
 .my-pocket-card {
+  width: 106px;
   height: 148px;
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.7), 0 0 0 2px rgba(231, 76, 60, 0.15);
-  display: block;
 }
 
 /* ── ACTIONS ZONE ────────────────────────────── */
@@ -1419,84 +1750,307 @@ onMounted(() => {
 .hands-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
+  background: rgba(8, 4, 4, 0.75);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 300;
-  padding: 20px;
+  padding: 16px;
 }
 .hands-modal {
-  background: #180d0d;
-  border: 1px solid rgba(231, 76, 60, 0.3);
+  background: linear-gradient(145deg, rgba(26, 15, 15, 0.96), rgba(18, 10, 10, 0.98));
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(231, 76, 60, 0.25);
   border-radius: 16px;
-  max-width: 520px;
+  max-width: 780px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  overflow-x: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9), 0 0 40px rgba(231, 76, 60, 0.05);
 }
+
+/* Scrollbar premium */
+.hands-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.hands-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+.hands-modal::-webkit-scrollbar-thumb {
+  background: rgba(231, 76, 60, 0.25);
+  border-radius: 8px;
+}
+.hands-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(231, 76, 60, 0.45);
+}
+
 .hands-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(231, 76, 60, 0.15);
+  padding: 14px 20px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.05);
   position: sticky;
   top: 0;
-  background: #180d0d;
-  z-index: 1;
+  background: rgba(26, 15, 15, 0.98);
+  backdrop-filter: blur(10px);
+  z-index: 10;
 }
-.hands-modal-title { font-size: 0.9rem; font-weight: 900; letter-spacing: 2px; color: #e74c3c; }
+.hands-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hands-modal-icon {
+  font-size: 1.2rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+.hands-modal-title {
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #ffd700 0%, #e74c3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .hands-modal-close {
   background: transparent;
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #7f8c8d;
-  width: 28px; height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a4b0be;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 0.85rem;
-  display: flex; align-items: center; justify-content: center;
-  transition: 0.15s;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
-.hands-modal-close:hover { border-color: #e74c3c; color: #e74c3c; }
-.hands-list { display: flex; flex-direction: column; gap: 0; }
+.hands-modal-close:hover {
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  transform: rotate(90deg);
+}
+.hands-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+.hands-column {
+  display: flex;
+  flex-direction: column;
+}
+.hands-column:first-child {
+  border-right: 1.5px solid rgba(255, 255, 255, 0.05);
+}
 .hand-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-  transition: background 0.15s;
-}
-.hand-row:hover { background: rgba(231, 76, 60, 0.04); }
-.hand-rank-badge {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: rgba(231, 76, 60, 0.12);
-  border: 1.5px solid rgba(231, 76, 60, 0.3);
-  color: #e74c3c;
-  font-size: 0.8rem; font-weight: 900;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.hand-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.hand-name { font-size: 0.88rem; font-weight: 700; color: #ecf0f1; }
-.hand-desc { font-size: 0.75rem; color: #7f8c8d; }
-.hand-example { font-size: 0.82rem; color: #bdc3c7; flex-shrink: 0; }
-.hands-modal-note {
-  font-size: 0.75rem;
-  color: #7f8c8d;
-  text-align: center;
-  padding: 12px 20px;
-  margin: 0;
-  border-top: 1px solid rgba(255,255,255,0.04);
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.modal-fade-enter-active { transition: all 0.25s ease; }
-.modal-fade-leave-active { transition: all 0.2s ease; }
-.modal-fade-enter-from { opacity: 0; }
-.modal-fade-leave-to { opacity: 0; }
+/* Hover effects according to tiers */
+.hand-row.tier-legendary:hover {
+  background: rgba(255, 215, 0, 0.03);
+  box-shadow: inset 4px 0 0 #ffd700;
+  transform: translateX(3px);
+}
+.hand-row.tier-epic:hover {
+  background: rgba(231, 76, 60, 0.03);
+  box-shadow: inset 4px 0 0 #e74c3c;
+  transform: translateX(3px);
+}
+.hand-row.tier-rare:hover {
+  background: rgba(52, 152, 219, 0.03);
+  box-shadow: inset 4px 0 0 #3498db;
+  transform: translateX(3px);
+}
+.hand-row.tier-basic:hover {
+  background: rgba(149, 165, 166, 0.03);
+  box-shadow: inset 4px 0 0 #7f8c8d;
+  transform: translateX(3px);
+}
+
+/* Badges styling */
+.hand-rank-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.tier-legendary .hand-rank-badge { border-color: #ffd700; color: #ffd700; text-shadow: 0 0 4px rgba(255, 215, 0, 0.4); }
+.tier-epic .hand-rank-badge { border-color: #e74c3c; color: #e74c3c; }
+.tier-rare .hand-rank-badge { border-color: #3498db; color: #3498db; }
+.tier-basic .hand-rank-badge { border-color: #7f8c8d; color: #bdc3c7; }
+
+/* Meta info */
+.hand-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0; /* Prevents text overflow */
+}
+.hand-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hand-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f5f6fa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hand-tier-tag {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.tier-legendary .hand-tier-tag { background: rgba(255, 215, 0, 0.12); color: #ffd700; border-color: rgba(255, 215, 0, 0.25); }
+.tier-epic .hand-tier-tag { background: rgba(231, 76, 60, 0.12); color: #e74c3c; border-color: rgba(231, 76, 60, 0.25); }
+.tier-rare .hand-tier-tag { background: rgba(52, 152, 219, 0.12); color: #3498db; border-color: rgba(52, 152, 219, 0.25); }
+.tier-basic .hand-tier-tag { background: rgba(149, 165, 166, 0.12); color: #bdc3c7; border-color: rgba(149, 165, 166, 0.25); }
+
+.hand-desc {
+  font-size: 0.72rem;
+  color: #a4b0be;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card deck display */
+.hand-example-deck {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-left: 6px;
+  flex-shrink: 0;
+}
+.hand-mini-card {
+  width: 24px;
+  height: 36px;
+  background: #ffffff;
+  border-radius: 3px;
+  border: 1px solid #dcdde1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), z-index 0.2s;
+  cursor: pointer;
+  user-select: none;
+}
+.hand-mini-card:not(:first-child) {
+  margin-left: -6px;
+}
+.hand-mini-card:hover {
+  transform: translateY(-6px) scale(1.25);
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.hand-mini-card .mini-card-value {
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: -1px;
+}
+.hand-mini-card .mini-card-suit {
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+/* Suits colors */
+.hand-mini-card.red {
+  color: #e74c3c;
+}
+.hand-mini-card.black {
+  color: #2c3e50;
+}
+
+/* Kicker / Extra card styling */
+.hand-mini-card.is-extra {
+  opacity: 0.45;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+.hand-mini-card.is-extra.red {
+  color: rgba(231, 76, 60, 0.75);
+  border-color: rgba(231, 76, 60, 0.35);
+}
+.hand-mini-card.is-extra.black {
+  color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.hand-mini-card.is-extra:hover {
+  opacity: 0.85;
+}
+
+.hands-modal-footer {
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.04);
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+.hands-modal-note {
+  font-size: 0.7rem;
+  color: #8892b0;
+  text-align: center;
+  padding: 10px 20px;
+  margin: 0;
+}
+
+.modal-fade-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-fade-leave-active { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-fade-enter-from { opacity: 0; transform: scale(0.96); }
+.modal-fade-leave-to { opacity: 0; transform: scale(0.96); }
+
+/* Responsive layout for mobile screens */
+@media (max-width: 680px) {
+  .hands-list {
+    grid-template-columns: 1fr;
+  }
+  .hands-column:first-child {
+    border-right: none;
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.05);
+  }
+  .hand-row {
+    padding: 6px 14px;
+  }
+  .hand-desc {
+    white-space: normal; /* wrap desc on mobile to avoid cutoffs */
+  }
+}
 
 /* ── WAITING MSG OVERLAY ──────────────────────── */
 .waiting-msg-overlay {
@@ -1556,6 +2110,113 @@ onMounted(() => {
 }
 .btn-secondary:hover { border-color: rgba(231, 76, 60, 0.5); color: #ecf0f1; }
 
+/* ── ONE SHOT TOGGLE (lobby) ──────────────────── */
+.oneshot-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #1e1010;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 14px 20px;
+  max-width: 400px;
+  width: 100%;
+  transition: border-color 0.3s, background 0.3s;
+}
+.oneshot-toggle.active {
+  border-color: rgba(231, 76, 60, 0.45);
+  background: rgba(231, 76, 60, 0.07);
+}
+.oneshot-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.oneshot-label {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ecf0f1;
+}
+.oneshot-desc {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+.oneshot-toggle.active .oneshot-desc { color: #e74c3c; }
+
+.oneshot-btn {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 13px;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: all 0.25s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.oneshot-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.oneshot-btn.on {
+  background: rgba(231, 76, 60, 0.25);
+  border-color: #e74c3c;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+}
+.oneshot-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a2020;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: block;
+}
+.oneshot-btn.on .oneshot-switch-knob {
+  left: calc(100% - 20px);
+  background: #e74c3c;
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.6);
+}
+
+/* ── ONE SHOT BADGE (top bar) ─────────────────── */
+.oneshot-badge {
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  padding: 3px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+  animation: pulseBadge 2s ease-in-out infinite;
+}
+@keyframes pulseBadge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+  50%       { box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.12); }
+}
+
+/* ── ONE SHOT GAME OVER SCORE ─────────────────── */
+.go-score-item.oneshot-score {
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(231, 76, 60, 0.25);
+}
+.go-oneshot-count {
+  font-size: 4rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #e74c3c;
+  text-shadow: 0 0 20px rgba(231, 76, 60, 0.4);
+}
+
 /* ══════════════════════════════════════════════
    GAME OVER SCREEN
 ══════════════════════════════════════════════ */
@@ -1600,7 +2261,14 @@ onMounted(() => {
 
 .go-final-hands { width: 100%; display: flex; flex-direction: column; gap: 0; text-align: left; }
 .go-community { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
-.go-comm-card { height: 66px; border-radius: 4px; }
+.go-comm-card { width: 47px; height: 66px; border-radius: 4px; }
+.go-comm-card .card-suit-large { font-size: 1.4em; }
+.go-comm-card .card-value      { font-size: 0.72em; }
+.go-comm-card .card-suit       { font-size: 0.6em; }
+
+.go-pocket-card .card-suit-large { font-size: 1.2em; }
+.go-pocket-card .card-value      { font-size: 0.68em; }
+.go-pocket-card .card-suit       { font-size: 0.55em; }
 
 .go-hand-row {
   display: flex;
@@ -1622,7 +2290,7 @@ onMounted(() => {
 .go-player-name { font-size: 0.9rem; font-weight: 700; color: #ecf0f1; }
 .go-hand-name { font-size: 0.78rem; color: #bdc3c7; }
 .go-pocket-cards { display: flex; gap: 4px; }
-.go-pocket-card { height: 52px; border-radius: 3px; }
+.go-pocket-card { width: 37px; height: 52px; border-radius: 3px; }
 
 .go-arrow { padding: 4px 14px; font-size: 0.72rem; font-weight: 700; text-align: center; letter-spacing: 0.5px; }
 .go-arrow.ok  { color: #2ecc71; background: rgba(39, 174, 96, 0.06); }
@@ -1645,7 +2313,7 @@ onMounted(() => {
   .comm-card-slot { width: 64px; height: 90px; }
   .comm-card { width: 64px; height: 90px; }
   .comm-card-placeholder { width: 64px; height: 90px; }
-  .my-pocket-card { height: 110px; }
+  .my-pocket-card { width: 79px; height: 110px; }
   .poker-table { padding: 14px 16px; }
   .tokens-grid { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
   .token-cell { height: 60px; }
@@ -1658,7 +2326,7 @@ onMounted(() => {
   .comm-card-slot { width: 100px; height: 140px; }
   .comm-card { width: 100px; height: 140px; }
   .comm-card-placeholder { width: 100px; height: 140px; }
-  .my-pocket-card { height: 168px; }
+  .my-pocket-card { width: 120px; height: 168px; }
   .right-panel { width: 320px; }
 }
 </style>

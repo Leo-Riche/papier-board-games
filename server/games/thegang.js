@@ -141,11 +141,12 @@ const getBestHand = (pocketCards, communityCards) => {
 };
 
 class TheGang {
-  constructor(roomCode, playersData, io) {
+  constructor(roomCode, playersData, io, options = {}) {
     this.roomCode = roomCode;
     this.io = io;
     this.players = playersData;
     this.hostId = playersData[0]?.id || null;
+    this.oneShotMode = options.oneShotMode || false;
 
     this.state = {
       status: 'playing',
@@ -372,7 +373,22 @@ class TheGang {
       }))
     };
 
-    if (this.state.heists >= 3) {
+    if (this.oneShotMode) {
+      if (!success) {
+        this.state.status = 'finished';
+        showdownResult.gameOver = true;
+        showdownResult.outcome = 'defeat';
+        showdownResult.oneShotMode = true;
+        const n = this.state.heists;
+        showdownResult.reason = n === 0
+          ? '💥 Éliminé dès le premier braquage !'
+          : `🚔 La série s'arrête ici. ${n} braquage${n > 1 ? 's' : ''} réussi${n > 1 ? 's' : ''} de suite !`;
+        this.io.to(this.roomCode).emit('game_over', showdownResult);
+      } else {
+        this.state.showdownResult = showdownResult;
+        this.state.status = 'showdown';
+      }
+    } else if (this.state.heists >= 3) {
       this.state.status = 'finished';
       showdownResult.gameOver = true;
       showdownResult.outcome = 'victory';
@@ -452,7 +468,8 @@ class TheGang {
         allHaveTokens: this.state.players.every(p => p.tokenNumber !== null),
         showdownResult: this.state.showdownResult,
         currentHeistLog,
-        tokenHistory: this.state.tokenHistory
+        tokenHistory: this.state.tokenHistory,
+        oneShotMode: this.oneShotMode
       });
     });
   }
