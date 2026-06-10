@@ -74,20 +74,8 @@
             <!-- Community cards replayed -->
             <div class="sd-section-label">CARTES COMMUNES</div>
             <div class="sd-community">
-              <div v-for="card in showdownResult.communityCards" :key="card.suit + card.value"
-                   class="playing-card sd-comm-card" :class="getCardSuitColor(card)">
-                <div class="card-corner top-left">
-                  <span class="card-value">{{ card.value }}</span>
-                  <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                </div>
-                <div class="card-center">
-                  <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
-                </div>
-                <div class="card-corner bottom-right">
-                  <span class="card-value">{{ card.value }}</span>
-                  <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                </div>
-              </div>
+              <PlayingCard v-for="card in showdownResult.communityCards" :key="card.suit + card.value"
+                           :card="card" class="sd-comm-card" />
             </div>
 
             <!-- Results ordered by token -->
@@ -101,20 +89,8 @@
                     <span class="sd-hand">{{ p.handName }}</span>
                   </div>
                   <div class="sd-pocket">
-                    <div v-for="card in p.pocketCards" :key="card.suit + card.value"
-                         class="playing-card sd-pocket-card" :class="getCardSuitColor(card)">
-                      <div class="card-corner top-left">
-                        <span class="card-value">{{ card.value }}</span>
-                        <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                      </div>
-                      <div class="card-center">
-                        <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
-                      </div>
-                      <div class="card-corner bottom-right">
-                        <span class="card-value">{{ card.value }}</span>
-                        <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                      </div>
-                    </div>
+                    <PlayingCard v-for="card in p.pocketCards" :key="card.suit + card.value"
+                                 :card="card" class="sd-pocket-card" />
                   </div>
                 </div>
                 <div v-if="p.nextCorrect !== null" class="sd-connector" :class="p.nextCorrect ? 'ok' : 'bad'">
@@ -127,8 +103,8 @@
 
             <div class="sd-score-recap">
               <div class="sd-score-item">
-                <span class="sd-stars">{{ '★'.repeat(showdownResult.heists) }}{{ '☆'.repeat(3 - showdownResult.heists) }}</span>
-                <span class="sd-score-label">{{ showdownResult.heists }}/3 coffres</span>
+                <span class="sd-stars">{{ '★'.repeat(oneShotMode ? showdownResult.heists : Math.min(showdownResult.heists, 3)) }}{{ oneShotMode ? '' : '☆'.repeat(Math.max(0, 3 - showdownResult.heists)) }}</span>
+                <span class="sd-score-label">{{ oneShotMode ? `${showdownResult.heists} de suite` : `${showdownResult.heists}/3 coffres` }}</span>
               </div>
               <div class="sd-divider"></div>
               <div class="sd-score-item alarms">
@@ -249,20 +225,8 @@
               <div class="community-cards">
                 <div v-for="i in 5" :key="i" class="comm-card-slot"
                      :class="{ revealed: !!communityCards[i-1], upcoming: isUpcoming(i) }">
-                  <div v-if="communityCards[i-1]"
-                       class="playing-card comm-card" :class="getCardSuitColor(communityCards[i-1])">
-                    <div class="card-corner top-left">
-                      <span class="card-value">{{ communityCards[i-1].value }}</span>
-                      <span class="card-suit">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
-                    </div>
-                    <div class="card-center">
-                      <span class="card-suit-large">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
-                    </div>
-                    <div class="card-corner bottom-right">
-                      <span class="card-value">{{ communityCards[i-1].value }}</span>
-                      <span class="card-suit">{{ getCardSuitSymbol(communityCards[i-1]) }}</span>
-                    </div>
-                  </div>
+                  <PlayingCard v-if="communityCards[i-1]"
+                              :card="communityCards[i-1]" class="comm-card" />
                   <div v-else class="comm-card-placeholder">
                     <span v-if="isUpcoming(i)">?</span>
                   </div>
@@ -291,19 +255,7 @@
               </div>
               <div class="my-cards-row">
                 <div v-for="card in myPocketCards" :key="card.suit + card.value" class="my-card-wrap">
-                  <div class="playing-card my-pocket-card" :class="getCardSuitColor(card)">
-                    <div class="card-corner top-left">
-                      <span class="card-value">{{ card.value }}</span>
-                      <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                    </div>
-                    <div class="card-center">
-                      <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
-                    </div>
-                    <div class="card-corner bottom-right">
-                      <span class="card-value">{{ card.value }}</span>
-                      <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                    </div>
-                  </div>
+                  <PlayingCard :card="card" class="my-pocket-card" />
                 </div>
               </div>
             </div>
@@ -338,8 +290,11 @@
                 </div>
               </div>
 
-              <button v-if="!myHasPhaseVoted" class="btn-vote" @click="handlePhaseVote">
-                👍 Voter pour passer au {{ PHASE_LABELS[nextPhase] }}
+              <button v-if="!myHasPhaseVoted" class="btn-vote"
+                      :disabled="!allHaveTokens"
+                      @click="handlePhaseVote">
+                <span v-if="!allHaveTokens">⚠️ Tous les joueurs doivent avoir un jeton d'abord</span>
+                <span v-else>👍 Voter pour passer au {{ PHASE_LABELS[nextPhase] }}</span>
               </button>
               <button v-else class="btn-cancel-vote" @click="handleCancelPhaseVote">
                 ↩️ Annuler mon vote
@@ -505,7 +460,7 @@
           </template>
           <template v-else>
             <div class="go-score-item">
-              <span class="go-stars">{{ '★'.repeat(gameOverData?.heists ?? 0) }}{{ '☆'.repeat(3 - (gameOverData?.heists ?? 0)) }}</span>
+              <span class="go-stars">{{ '★'.repeat(Math.min(gameOverData?.heists ?? 0, 3)) }}{{ '☆'.repeat(Math.max(0, 3 - (gameOverData?.heists ?? 0))) }}</span>
               <span>{{ gameOverData?.heists }}/3 braquages réussis</span>
             </div>
             <div class="go-score-item alarms">
@@ -516,20 +471,8 @@
 
         <div class="go-final-hands" v-if="gameOverData?.playerResults">
           <div class="go-community">
-            <div v-for="card in gameOverData.communityCards" :key="card.suit+card.value"
-                 class="playing-card go-comm-card" :class="getCardSuitColor(card)">
-              <div class="card-corner top-left">
-                <span class="card-value">{{ card.value }}</span>
-                <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-              </div>
-              <div class="card-center">
-                <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
-              </div>
-              <div class="card-corner bottom-right">
-                <span class="card-value">{{ card.value }}</span>
-                <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-              </div>
-            </div>
+            <PlayingCard v-for="card in gameOverData.communityCards" :key="card.suit+card.value"
+                         :card="card" class="go-comm-card" />
           </div>
           <div v-for="(p, i) in gameOverData.playerResults" :key="i">
             <div class="go-hand-row">
@@ -539,20 +482,8 @@
                 <span class="go-hand-name">{{ p.handName }}</span>
               </div>
               <div class="go-pocket-cards">
-                <div v-for="card in p.pocketCards" :key="card.suit+card.value"
-                     class="playing-card go-pocket-card" :class="getCardSuitColor(card)">
-                  <div class="card-corner top-left">
-                    <span class="card-value">{{ card.value }}</span>
-                    <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                  </div>
-                  <div class="card-center">
-                    <span class="card-suit-large">{{ getCardSuitSymbol(card) }}</span>
-                  </div>
-                  <div class="card-corner bottom-right">
-                    <span class="card-value">{{ card.value }}</span>
-                    <span class="card-suit">{{ getCardSuitSymbol(card) }}</span>
-                  </div>
-                </div>
+                <PlayingCard v-for="card in p.pocketCards" :key="card.suit+card.value"
+                             :card="card" class="go-pocket-card" />
               </div>
             </div>
             <div v-if="p.nextCorrect !== null" class="go-arrow" :class="p.nextCorrect ? 'ok' : 'bad'">
@@ -576,6 +507,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 import TokenChip from './TokenChip.vue'
+import PlayingCard from './PlayingCard.vue'
 
 // Card images
 const cardImages = import.meta.glob('../../assets/images/Cards/*.png', { eager: true })
@@ -1081,8 +1013,6 @@ onMounted(() => {
 
 .sd-community { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .sd-comm-card { width: 63px; height: 88px; border-radius: 5px; box-shadow: 0 4px 14px rgba(0,0,0,0.6); }
-.sd-comm-card .card-suit-large { font-size: 1.7em; }
-
 
 
 .sd-results { display: flex; flex-direction: column; }
@@ -1115,9 +1045,6 @@ onMounted(() => {
 
 .sd-pocket { display: flex; gap: 5px; }
 .sd-pocket-card { width: 43px; height: 60px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
-.sd-pocket-card .card-suit-large { font-size: 1.3em; }
-.sd-pocket-card .card-value      { font-size: 0.7em; }
-.sd-pocket-card .card-suit       { font-size: 0.58em; }
 
 .sd-connector {
   display: flex;
@@ -1257,37 +1184,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-/* ── PLAYING CARDS (shared base style) ──────── */
-.playing-card {
-  background: #ffffff;
-  border: 1.5px solid #dcdde1;
-  border-radius: 6px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.playing-card.red   { color: #e74c3c; }
-.playing-card.black { color: #1e272e; }
-
-.card-corner {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-  gap: 1px;
-}
-.card-corner.top-left     { top: 5%; left: 10%; }
-.card-corner.bottom-right { bottom: 5%; right: 10%; transform: rotate(180deg); }
-
-.card-value      { font-size: 1.05em; font-weight: 900; line-height: 1; }
-.card-suit       { font-size: 0.9em;  line-height: 1; }
-.card-suit-large { font-size: 2.5em;  line-height: 1; }
-
 /* Community Cards — big and central */
 .community-cards {
   display: flex;
@@ -1316,8 +1212,6 @@ onMounted(() => {
 .comm-card {
   width: 88px;
   height: 124px;
-  object-fit: contain;
-  border-radius: 6px;
   animation: cardReveal 0.4s ease;
 }
 
@@ -1486,7 +1380,8 @@ onMounted(() => {
   transition: 0.2s;
   text-align: center;
 }
-.btn-vote:hover { background: rgba(231, 76, 60, 0.18); transform: translateY(-1px); }
+.btn-vote:hover:not(:disabled) { background: rgba(231, 76, 60, 0.18); transform: translateY(-1px); }
+.btn-vote:disabled { border-color: rgba(100, 100, 100, 0.15); color: #4a4040; cursor: not-allowed; background: transparent; }
 
 .btn-cancel-vote {
   width: 100%;
@@ -2262,13 +2157,6 @@ onMounted(() => {
 .go-final-hands { width: 100%; display: flex; flex-direction: column; gap: 0; text-align: left; }
 .go-community { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
 .go-comm-card { width: 47px; height: 66px; border-radius: 4px; }
-.go-comm-card .card-suit-large { font-size: 1.4em; }
-.go-comm-card .card-value      { font-size: 0.72em; }
-.go-comm-card .card-suit       { font-size: 0.6em; }
-
-.go-pocket-card .card-suit-large { font-size: 1.2em; }
-.go-pocket-card .card-value      { font-size: 0.68em; }
-.go-pocket-card .card-suit       { font-size: 0.55em; }
 
 .go-hand-row {
   display: flex;

@@ -11,14 +11,26 @@ const TheGang = require('./games/thegang');
 const Charger = require('./games/charger');
 
 const app = express();
-app.use(cors());
+
+const ALLOWED_ORIGINS = [
+  'https://papier-board-games.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
+
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
 
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // Autorise Vercel à se connecter
-    methods: ["GET", "POST"]
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+    credentials: true,
   }
 });
 

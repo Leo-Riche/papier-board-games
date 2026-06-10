@@ -206,6 +206,7 @@ class TheGang {
   handlePhaseVote(socketId) {
     if (this.state.status !== 'playing') return;
     if (PHASES.indexOf(this.state.phase) >= PHASES.length - 1) return; // At river, use validate instead
+    if (!this.state.players.every(p => p.tokenNumber !== null)) return; // Tous les jetons doivent être pris
 
     if (this.state.phaseVotes.has(socketId)) return; // Already voted
 
@@ -233,6 +234,9 @@ class TheGang {
   _doAdvancePhase() {
     const phaseIndex = PHASES.indexOf(this.state.phase);
     if (phaseIndex >= PHASES.length - 1) return;
+
+    // Snapshot les jetons de la phase qui se termine
+    this._recordPhaseTokens(this.state.phase);
 
     const nextPhase = PHASES[phaseIndex + 1];
     this.state.phase = nextPhase;
@@ -270,18 +274,20 @@ class TheGang {
     // Assign token
     player.tokenNumber = tokenNumber;
 
-    // Update live phaseLog for this heist: persist across phase changes
-    const name = player.name;
-    const ph = this.state.phase;
-    if (!this.state.phaseLog[name]) this.state.phaseLog[name] = {};
-    if (!this.state.phaseLog[name][ph]) this.state.phaseLog[name][ph] = [];
-    this.state.phaseLog[name][ph].push(tokenNumber);
-
     // Reset river validations AND phase votes when tokens change
     this.state.validations = new Set();
     this.state.phaseVotes = new Set();
 
     this.broadcastState();
+  }
+
+  _recordPhaseTokens(phase) {
+    for (const player of this.state.players) {
+      if (player.tokenNumber !== null) {
+        if (!this.state.phaseLog[player.name]) this.state.phaseLog[player.name] = {};
+        this.state.phaseLog[player.name][phase] = [player.tokenNumber];
+      }
+    }
   }
 
   handleReleaseToken(socketId) {
