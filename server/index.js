@@ -257,7 +257,10 @@ io.on('connection', (socket) => {
   });
 
   // ── THE GANG ────────────────────────────────────────────────
-  socket.on('start_thegang', (roomCode) => {
+  socket.on('start_thegang', (payload) => {
+    // Support both legacy string and new object format
+    const roomCode = typeof payload === 'string' ? payload : payload.roomCode;
+    const options  = typeof payload === 'object' ? (payload.options || {}) : {};
     const cleanRoomCode = roomCode.trim();
     const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
 
@@ -274,9 +277,13 @@ io.on('connection', (socket) => {
       return { id, name: s.playerName || 'Anonyme' };
     });
 
-    const game = new TheGang(cleanRoomCode, playersData, io);
+    const game = new TheGang(cleanRoomCode, playersData, io, options);
     activeGames[cleanRoomCode] = game;
     game.start();
+  });
+
+  socket.on('thegang_sync_option', ({ roomCode, key, value }) => {
+    io.to(roomCode.trim()).emit('thegang_option_updated', { key, value });
   });
 
   socket.on('thegang_action', (data) => {
