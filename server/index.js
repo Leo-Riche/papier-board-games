@@ -259,8 +259,13 @@ io.on('connection', (socket) => {
   // ── THE GANG ────────────────────────────────────────────────
   socket.on('start_thegang', (payload) => {
     // Support both legacy string and new object format
-    const roomCode = typeof payload === 'string' ? payload : payload.roomCode;
-    const options  = typeof payload === 'object' ? (payload.options || {}) : {};
+    const roomCode = typeof payload === 'string' ? payload : (payload && payload.roomCode);
+    const options  = typeof payload === 'object' && payload ? (payload.options || {}) : {};
+
+    if (!roomCode || typeof roomCode !== 'string') {
+      return console.log(`🚫 start_thegang: roomCode invalide (payload=${JSON.stringify(payload)})`);
+    }
+
     const cleanRoomCode = roomCode.trim();
     const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
 
