@@ -27,6 +27,10 @@ import ChargerLobby from '../views/Charger/ChargerLobby.vue'
 import ChargerBoard from '../views/Charger/ChargerBoard.vue'
 import ChargerJoin from '../views/Charger/ChargerJoin.vue'
 
+import SkullKingLobby from '../views/SkullKing/SkullKingLobby.vue'
+import SkullKingBoard from '../views/SkullKing/SkullKingBoard.vue'
+import SkullKingJoin from '../views/SkullKing/SkullKingJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -129,6 +133,23 @@ const routes = [
     path: '/charger/join/:id',
     name: 'ChargerJoin',
     component: ChargerJoin,
+    props: true
+  },
+  {
+    path: '/skullking/lobby',
+    name: 'SkullKingLobby',
+    component: SkullKingLobby
+  },
+  {
+    path: '/skullking/game/:id',
+    name: 'SkullKingBoard',
+    component: SkullKingBoard,
+    props: true
+  },
+  {
+    path: '/skullking/join/:id',
+    name: 'SkullKingJoin',
+    component: SkullKingJoin,
     props: true
   },
 ]

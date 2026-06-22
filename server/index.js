@@ -9,6 +9,7 @@ const Qwixx = require('./games/qwixx');
 const Yams = require('./games/yams');
 const TheGang = require('./games/thegang');
 const Charger = require('./games/charger');
+const SkullKing = require('./games/skullking');
 
 const app = express();
 
@@ -253,6 +254,53 @@ io.on('connection', (socket) => {
     const game = activeGames[cleanRoomCode];
     if (game && game instanceof Charger) {
       game.handleAction(socket.id, actionType, payload);
+    }
+  });
+
+  // ── SKULL KING ──────────────────────────────────────────────
+  socket.on('start_skullking', (payload) => {
+    const roomCode = typeof payload === 'string' ? payload : (payload && payload.roomCode);
+    const options  = typeof payload === 'object' && payload ? (payload.options || {}) : {};
+
+    if (!roomCode || typeof roomCode !== 'string') {
+      return console.log(`🚫 start_skullking: roomCode invalide (payload=${JSON.stringify(payload)})`);
+    }
+
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+
+    if (clients.length < 3 || clients.length > 8) {
+      return socket.emit('skullking_error', `Skull King nécessite entre 3 et 8 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    const playersData = clients.map(id => {
+      const s = io.sockets.sockets.get(id);
+      return { id, name: s.playerName || 'Anonyme' };
+    });
+
+    const game = new SkullKing(cleanRoomCode, playersData, io, options);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('skullking_sync_option', ({ roomCode, key, value }) => {
+    io.to(roomCode.trim()).emit('skullking_option_updated', { key, value });
+  });
+
+  socket.on('skullking_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof SkullKing) {
+      switch (actionType) {
+        case 'bid':         game.handleBid(socket.id, payload.bid); break;
+        case 'cancel_bid':  game.handleCancelBid(socket.id); break;
+        case 'play_card':   game.handlePlayCard(socket.id, payload.cardId, payload); break;
+      }
     }
   });
 
