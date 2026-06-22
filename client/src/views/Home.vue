@@ -40,6 +40,13 @@
         <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
+
+      <div class="game-card" @click="$router.push('/skullking/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Skull King 💀👑</h2>
+        <p>Misez le nombre exact de plis que vous remporterez et devenez le Capitaine des Sept Mers !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
     </div>
   </div>
 </template>
