@@ -21,21 +21,18 @@
       </div>
 
       <div class="game-card" @click="$router.push('/yams/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Yams 🎲</h2>
         <p>Lancez les dés, composez vos combinaisons et visez le Yams pour la victoire !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
       <div class="game-card" @click="$router.push('/thegang/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>The Gang 🔫</h2>
         <p>Coopératif & silencieux : classez vos mains de poker sans parler et réussissez 3 braquages !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
       
       <div class="game-card" @click="$router.push('/charger/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Chargeeer 🛡️</h2>
         <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
         <button class="btn-play">Jouer maintenant</button>
