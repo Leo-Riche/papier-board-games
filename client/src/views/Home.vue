@@ -39,9 +39,15 @@
       </div>
 
       <div class="game-card" @click="$router.push('/skullking/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Skull King 💀👑</h2>
         <p>Misez le nombre exact de plis que vous remporterez et devenez le Capitaine des Sept Mers !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
+
+      <div class="game-card" @click="$router.push('/traitre/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Traître à bord 🏴‍☠️</h2>
+        <p>Des Mutins se cachent parmi l'équipage. Remplissez le Coffre... ou sabotez la collecte et semez la mutinerie !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
     </div>

@@ -10,6 +10,7 @@ const Yams = require('./games/yams');
 const TheGang = require('./games/thegang');
 const Charger = require('./games/charger');
 const SkullKing = require('./games/skullking');
+const Traitre = require('./games/traitre');
 
 const app = express();
 
@@ -301,6 +302,38 @@ io.on('connection', (socket) => {
         case 'cancel_bid':  game.handleCancelBid(socket.id); break;
         case 'play_card':   game.handlePlayCard(socket.id, payload.cardId, payload); break;
       }
+    }
+  });
+
+  // ── TRAÎTRE À BORD ──────────────────────────────────────────
+  socket.on('start_traitre', (roomCode) => {
+    const cleanRoomCode = (typeof roomCode === 'string' ? roomCode : '').trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+
+    if (clients.length < 3 || clients.length > 8) {
+      return socket.emit('traitre_error', `Traître à bord se joue de 3 à 8 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    const playersData = clients.map(id => {
+      const s = io.sockets.sockets.get(id);
+      return { id, name: s.playerName || 'Anonyme' };
+    });
+
+    const game = new Traitre(cleanRoomCode, playersData, io);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('traitre_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof Traitre) {
+      game.handleAction(socket.id, actionType, payload || {});
     }
   });
 

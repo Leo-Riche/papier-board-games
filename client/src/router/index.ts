@@ -31,6 +31,10 @@ import SkullKingLobby from '../views/SkullKing/SkullKingLobby.vue'
 import SkullKingBoard from '../views/SkullKing/SkullKingBoard.vue'
 import SkullKingJoin from '../views/SkullKing/SkullKingJoin.vue'
 
+import TraitreLobby from '../views/Traitre/TraitreLobby.vue'
+import TraitreBoard from '../views/Traitre/TraitreBoard.vue'
+import TraitreJoin from '../views/Traitre/TraitreJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -150,6 +154,23 @@ const routes = [
     path: '/skullking/join/:id',
     name: 'SkullKingJoin',
     component: SkullKingJoin,
+    props: true
+  },
+  {
+    path: '/traitre/lobby',
+    name: 'TraitreLobby',
+    component: TraitreLobby
+  },
+  {
+    path: '/traitre/:id',
+    name: 'TraitreBoard',
+    component: TraitreBoard,
+    props: true
+  },
+  {
+    path: '/traitre/join/:id',
+    name: 'TraitreJoin',
+    component: TraitreJoin,
     props: true
   },
 ]
