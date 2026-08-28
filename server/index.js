@@ -231,7 +231,10 @@ io.on('connection', (socket) => {
     const cleanRoomCode = roomCode.trim();
     const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
 
-    if (clients[0] !== socket.id) {
+    // Hôte = premier socket de la room, OU (au REJOUER) le pseudo hôte de la partie précédente
+    const prevGame = activeGames[cleanRoomCode];
+    const isHostByName = prevGame && prevGame.hostName && socket.playerName === prevGame.hostName;
+    if (clients[0] !== socket.id && !isHostByName) {
       return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
     }
 
@@ -243,6 +246,11 @@ io.on('connection', (socket) => {
       const s = io.sockets.sockets.get(id);
       return { id: id, name: s.playerName || 'Anonyme' };
     });
+    // Garder le même hôte qu'avant si possible (sinon premier de la liste)
+    if (prevGame && prevGame.hostName) {
+      const idx = playersData.findIndex(p => p.name === prevGame.hostName);
+      if (idx > 0) { const [h] = playersData.splice(idx, 1); playersData.unshift(h); }
+    }
 
     const game = new Charger(cleanRoomCode, playersData, io);
     activeGames[cleanRoomCode] = game;
