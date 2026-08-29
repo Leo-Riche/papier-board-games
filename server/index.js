@@ -11,6 +11,7 @@ const TheGang = require('./games/thegang');
 const Charger = require('./games/charger');
 const SkullKing = require('./games/skullking');
 const Traitre = require('./games/traitre');
+const Belote = require('./games/belote');
 
 const app = express();
 
@@ -58,9 +59,10 @@ const updateRoomPlayers = (roomCode) => {
 
 io.on('connection', (socket) => {
   
-  socket.on('set_player_name', ({ name, roomCode }) => {
+  socket.on('set_player_name', ({ name, roomCode, maxPlayers }) => {
     const cleanRoomCode = roomCode.trim();
     const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+    const roomCap = Number.isInteger(maxPlayers) && maxPlayers > 0 ? maxPlayers : 10;
 
     const allSockets = Array.from(io.sockets.sockets.values());
     const duplicate = allSockets.find(s => 
@@ -73,9 +75,9 @@ io.on('connection', (socket) => {
       duplicate.disconnect(true);
     }
 
-    if (!duplicate && clients.length >= 10) {
-      socket.emit('room_full', 'La salle est pleine (10 joueurs maximum) !');
-      return; 
+    if (!duplicate && clients.length >= roomCap) {
+      socket.emit('room_full', `La table est complète (${roomCap} joueurs maximum) !`);
+      return;
     }
 
     socket.playerName = name; 
@@ -84,16 +86,21 @@ io.on('connection', (socket) => {
     console.log(`👤 ${name} est actif dans ${cleanRoomCode}`);
     socket.emit('name_set', { name: name });
     
-    if (activeGames[cleanRoomCode] && activeGames[cleanRoomCode].state.status === 'playing') {
+    // Reconnexion : dès qu'une partie est en cours, quelle que soit la phase (pas seulement
+    // "playing"), sinon un simple rechargement fige la partie (ex. Belote pendant la coupe /
+    // le choix de l'atout). On exclut "finished" : là, le chemin normal doit reprendre la main
+    // (Charger / Traître ne rejouent pas "game_over" sur reconnexion → écran de fin bloqué).
+    const gameStatus = activeGames[cleanRoomCode] && activeGames[cleanRoomCode].state.status;
+    if (gameStatus && gameStatus !== 'waiting' && gameStatus !== 'finished') {
 
       const hasReconnected = activeGames[cleanRoomCode].reconnectPlayer(socket.id, name);
-      
+
       if (hasReconnected) {
         console.log(`🔄 Reconnexion réussie pour ${name} dans ${cleanRoomCode}`);
         socket.emit('game_started');
         activeGames[cleanRoomCode].broadcastState();
 
-        return; 
+        return;
       }
     }
     
@@ -405,6 +412,68 @@ io.on('connection', (socket) => {
         case 'validate':          game.handleValidate(socket.id); break;
         case 'next_heist':        game.handleNextHeist(socket.id); break;
       }
+    }
+  });
+
+  // ── BELOTE ─────────────────────────────────────────────────
+  socket.on('belote_sync_option', ({ roomCode, key, value }) => {
+    io.to(roomCode.trim()).emit('belote_option_updated', { key, value });
+  });
+
+  socket.on('belote_set_seating', ({ roomCode, seatOrder }) => {
+    io.to(roomCode.trim()).emit('belote_seating', seatOrder);
+  });
+
+  socket.on('start_belote', (payload) => {
+    const roomCode = typeof payload === 'string' ? payload : (payload && payload.roomCode);
+    const options  = (typeof payload === 'object' && payload) ? (payload.options || {}) : {};
+    const seatOrder = (typeof payload === 'object' && payload && Array.isArray(payload.seatOrder))
+      ? payload.seatOrder : null;
+
+    if (!roomCode || typeof roomCode !== 'string') {
+      return console.log(`🚫 start_belote: roomCode invalide`);
+    }
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    // Hôte = 1er socket de la room, OU (pour « NOUVELLE PARTIE » après des reconnexions
+    // qui ont changé l'ordre des sockets) le pseudo hôte de la partie précédente.
+    const prevGame = activeGames[cleanRoomCode];
+    const isHostByName = prevGame instanceof Belote && prevGame.hostName
+      && socket.playerName === prevGame.hostName;
+    if (clients[0] !== socket.id && !isHostByName) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+    if (clients.length !== 4) {
+      return socket.emit('belote_error', `La Belote se joue à exactement 4 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    let ordered = clients;
+    if (seatOrder && seatOrder.length === 4 &&
+        seatOrder.every((id) => clients.includes(id)) &&
+        new Set(seatOrder).size === 4) {
+      ordered = seatOrder;
+    }
+
+    const playersData = ordered.map((id) => ({
+      id,
+      name: io.sockets.sockets.get(id)?.playerName || 'Anonyme',
+    }));
+    options.hostName = isHostByName
+      ? socket.playerName
+      : (io.sockets.sockets.get(clients[0])?.playerName || playersData[0].name);
+
+    const game = new Belote(cleanRoomCode, playersData, io, options);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('belote_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof Belote) {
+      game.handleAction(socket.id, actionType, payload || {});
     }
   });
 

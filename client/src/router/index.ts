@@ -35,6 +35,10 @@ import TraitreLobby from '../views/Traitre/TraitreLobby.vue'
 import TraitreBoard from '../views/Traitre/TraitreBoard.vue'
 import TraitreJoin from '../views/Traitre/TraitreJoin.vue'
 
+import BeloteLobby from '../views/Belote/BeloteLobby.vue'
+import BeloteBoard from '../views/Belote/BeloteBoard.vue'
+import BeloteJoin from '../views/Belote/BeloteJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -171,6 +175,23 @@ const routes = [
     path: '/traitre/join/:id',
     name: 'TraitreJoin',
     component: TraitreJoin,
+    props: true
+  },
+  {
+    path: '/belote/lobby',
+    name: 'BeloteLobby',
+    component: BeloteLobby
+  },
+  {
+    path: '/belote/:id',
+    name: 'BeloteBoard',
+    component: BeloteBoard,
+    props: true
+  },
+  {
+    path: '/belote/join/:id',
+    name: 'BeloteJoin',
+    component: BeloteJoin,
     props: true
   },
 ]
