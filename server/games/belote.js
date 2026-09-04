@@ -12,6 +12,7 @@ const PLAIN_RANK = Object.fromEntries(PLAIN_ORDER.map((r, i) => [r, i]));
 const TRUMP_POINTS = { J: 20, '09': 14, A: 11, '10': 10, K: 4, Q: 3, '08': 0, '07': 0 };
 const PLAIN_POINTS = { A: 11, '10': 10, K: 4, Q: 3, J: 2, '09': 0, '08': 0, '07': 0 };
 const TRICK_PAUSE_MS = 3000; // délai avant de ramasser un pli complet
+const REVIEW_MAX_MS = 30000; // sécurité : un joueur qui "regarde le dernier pli" est relâché après 30 s
 
 const IS_RED = (s) => s === 'hearts' || s === 'diamonds';
 const SUIT_PREF = ['spades', 'hearts', 'clubs', 'diamonds']; // départage au sein d'une couleur
@@ -82,6 +83,11 @@ class Belote {
     this.targetScore = this.scoreMode === 'classic1000' ? 1000
       : this.scoreMode === 'short501' ? 501 : null;
     this.defaultSplit = options.defaultSplit === '2-3' ? '2-3' : '3-2';
+    // Malus "valet tournant" : si la main (1er à parler) refuse un valet retourné,
+    // son équipe perd 100 points sur le total, immédiatement.
+    this.valetMalus = !!options.valetMalus;
+    // Sièges en train de "revoir le dernier pli" -> personne ne peut jouer pendant ce temps.
+    this._reviewers = new Map(); // seat -> timeout de sécurité
 
     const tn = options.teamNames || {};
     this.teamNames = {
@@ -90,9 +96,16 @@ class Belote {
     };
 
     this.scores = { A: 0, B: 0 };
+    this.history = []; // feuille de score : { hand, trump, takerTeam, outcome, delta:{A,B}, totals:{A,B} }
     this.dealerSeat = Math.floor(Math.random() * 4);
     this.handNumber = 0;
     this.state = { status: 'waiting' };
+  }
+
+  _reviewerNames() { return [...this._reviewers.keys()].map((seat) => this.nameOf(seat)); }
+  _clearReviewers() {
+    for (const t of this._reviewers.values()) clearTimeout(t);
+    this._reviewers.clear();
   }
 
   tLabel(t) { return this.teamNames[t] || `Équipe ${t === 'A' ? '1' : '2'}`; }
@@ -126,6 +139,7 @@ class Belote {
   }
 
   _beginHand(isFirst = false, sameNumber = false) {
+    this._clearReviewers();
     if (!isFirst) {
       this.matchDeck = this._gatherDeck();          // ramasse la donne précédente…
       this.dealerSeat = nextSeat(this.dealerSeat);  // …AVANT de faire tourner le donneur
@@ -153,6 +167,7 @@ class Belote {
       beloteSeat: null,
       beloteProgress: 0,
       handResult: null,
+      lastTrick: null,
     };
 
     if (isFirst) {
@@ -215,6 +230,22 @@ class Belote {
     }
 
     if (type === 'bid_pass' && s.status === 'bidding' && seat === s.turnSeat) {
+      // Malus "valet tournant" : la main (1er à parler, aucun pass encore) refuse un valet retourné.
+      if (this.valetMalus && s.phase === 'bid1' && s.passes === 0
+          && s.retourne && s.retourne.value === 'J') {
+        const mt = teamOf(seat);
+        this.scores[mt] -= 100;
+        this.history.push({
+          hand: this.handNumber, malus: true, takerTeam: null, trump: s.retourne.suit,
+          delta: { A: mt === 'A' ? -100 : 0, B: mt === 'B' ? -100 : 0 },
+          totals: { A: this.scores.A, B: this.scores.B },
+        });
+        this.log(`😱 ${this.nameOf(seat)} refuse le valet tournant ! ${this.tLabel(mt)} −100 (total : ${this.scores[mt]}).`);
+        this.io.to(this.roomCode).emit('belote_valet_shame', {
+          seat, team: mt, name: this.nameOf(seat), suit: s.retourne.suit,
+          scores: { A: this.scores.A, B: this.scores.B },
+        });
+      }
       s.passes++;
       this.log(`🚫 ${this.nameOf(seat)} passe.`);
       if (s.passes >= 4) {
@@ -274,7 +305,30 @@ class Belote {
       return;
     }
 
+    if (type === 'review') {
+      if (s.status !== 'playing') return;
+      const had = this._reviewers.has(seat);
+      const canOpen = payload.open && s.lastTrick && s.currentTrick.length === 0;
+      const old = this._reviewers.get(seat);
+      if (old) clearTimeout(old);
+      this._reviewers.delete(seat);
+      if (canOpen) {
+        this._reviewers.set(seat, setTimeout(() => {
+          this._reviewers.delete(seat);
+          this.broadcastState();
+        }, REVIEW_MAX_MS));
+      }
+      if (had !== this._reviewers.has(seat)) this.broadcastState();
+      return;
+    }
+
     if (type === 'play_card' && s.status === 'playing' && !s.resolving && seat === s.turnSeat) {
+      if (this._reviewers.size > 0) {
+        this.io.to(playerId).emit('belote_error', this._reviewers.has(seat)
+          ? 'Ferme le dernier pli pour jouer.'
+          : `${this._reviewerNames().join(', ')} regarde le dernier pli…`);
+        return;
+      }
       const hand = s.hands[seat];
       const idx = hand.findIndex((c) => cardId(c) === payload.cardId);
       if (idx === -1) return;
@@ -341,8 +395,16 @@ class Belote {
 
     // Le pli est empilé (dans l'ordre de jeu) pour reconstituer le paquet à la fin de la donne
     s.trickPiles.push(s.currentTrick.map((t) => t.card));
+    // On garde le pli qu'on vient de ramasser pour permettre de le revoir
+    // (jusqu'à ce qu'une carte du pli suivant soit jouée).
+    s.lastTrick = {
+      cards: s.currentTrick.map((t) => ({ seat: t.seat, name: this.nameOf(t.seat), card: t.card })),
+      winnerSeat: winSeat,
+      trickNo: s.trickCount,
+    };
     s.currentTrick = [];
     s.leadSuit = null;
+    this._clearReviewers(); // nouveau "dernier pli" -> on repart de zéro
 
     if (isLast) {
       this._scoreHand();
@@ -395,6 +457,16 @@ class Belote {
       totals: { A: this.scores.A, B: this.scores.B },
     };
 
+    // Feuille de score : une ligne par donne jouée (les donnes blanches n'y figurent pas).
+    this.history.push({
+      hand: this.handNumber,
+      trump: s.trump,
+      takerTeam,
+      outcome,
+      delta: { A: s.handResult.delta.A || 0, B: s.handResult.delta.B || 0 },
+      totals: { A: this.scores.A, B: this.scores.B },
+    });
+
     const label = outcome === 'made' ? 'Contrat réussi'
       : outcome === 'chute' ? 'Chute !'
       : 'CAPOT !';
@@ -410,6 +482,7 @@ class Belote {
 
   _finish(forced = false) {
     const s = this.state;
+    this._clearReviewers();
     s.status = 'finished';
     const winner = this.scores.A === this.scores.B ? null : (this.scores.A > this.scores.B ? 'A' : 'B');
     this.io.to(this.roomCode).emit('game_over', {
@@ -509,6 +582,7 @@ class Belote {
         cutterName: (s.cutterSeat != null) ? this.nameOf(s.cutterSeat) : null,
         deckSize: (this.matchDeck && this.matchDeck.length) || 32,
         teamNames: this.teamNames,
+        valetMalus: this.valetMalus,
         split: s.split,
         trump: s.trump || null,
         takerSeat: s.takerSeat,
@@ -521,6 +595,9 @@ class Belote {
         currentTrick: s.currentTrick.map((t) => ({ seat: t.seat, name: this.nameOf(t.seat), card: t.card })),
         leadSuit: s.leadSuit,
         handPoints: s.handPoints,
+        lastTrick: (s.status === 'playing' && !s.currentTrick.length) ? (s.lastTrick || null) : null,
+        reviewers: this._reviewerNames(),
+        history: this.history,
         beloteSeat: s.beloteProgress > 0 ? s.beloteSeat : null,
         beloteTeam: (s.beloteProgress === 2 && s.beloteSeat != null) ? teamOf(s.beloteSeat) : null,
         seats: this.players.map((pp) => ({

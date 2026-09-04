@@ -9,6 +9,15 @@
       <div class="belote-flash-who">{{ beloteFlash.playerName }}<span v-if="beloteFlash.word === 'Rebelote'"> · +20 pts</span></div>
     </div>
 
+    <!-- Animation "valet tournant refusé" (malus) -->
+    <div v-if="shameFlash" class="shame-flash">
+      <div class="sf-emoji">😳</div>
+      <div class="sf-finger">👎</div>
+      <div class="sf-title">Valet tournant refusé&#8202;!</div>
+      <div class="sf-who">{{ shameFlash.name }}<span class="sf-suit" :class="suitColorName(shameFlash.suit)"> {{ suitSym(shameFlash.suit) }}</span></div>
+      <div class="sf-malus">La honte −100 points</div>
+    </div>
+
     <!-- ============ SALLE D'ATTENTE ============ -->
     <div v-if="gameStatus === 'waiting'" class="waiting-screen">
       <h1>Belote ♥</h1>
@@ -66,11 +75,16 @@
               <option value="single">Manche unique</option>
             </select>
           </label>
+          <label class="opt-check">
+            <input type="checkbox" v-model="valetMalus" @change="pushOption('valetMalus', valetMalus)" />
+            <span>Malus valet tournant<br /><small>−100 si la main refuse de prendre un valet retourné</small></span>
+          </label>
           <p class="opt-hint">La distribution (3-2 ou 2-3) est choisie par le donneur à chaque donne.</p>
         </div>
         <div class="lobby-panel" v-else>
           <h3>Format de partie</h3>
           <p class="opt-readonly">{{ modeLabel(scoreMode) }}</p>
+          <p v-if="valetMalus" class="opt-readonly small">⚠️ Malus valet tournant (−100)</p>
         </div>
       </div>
 
@@ -129,12 +143,13 @@
             <div v-if="beloteSeat === seatAtPos(pos).seat" class="belote-badge">
               ♥ {{ beloteTeam ? 'Belote-Rebelote' : 'Belote' }}
             </div>
-            <div class="hidden-hand">
+            <div class="hidden-hand" :class="{ dealing }">
               <BeloteCard
                 v-for="n in seatAtPos(pos).handCount"
                 :key="n"
                 face-down
                 class="mini-card"
+                :style="{ '--di': n - 1 }"
               />
             </div>
           </template>
@@ -152,10 +167,54 @@
           </div>
         </div>
 
-        <!-- Retourne (choix de l'atout) -->
-        <div v-if="retourne && (gameStatus === 'bidding' || gameStatus === 'choosing_split')" class="retourne-zone">
-          <span class="rz-label">Retourne</span>
-          <BeloteCard :card="retourne" class="rz-card" />
+        <!-- Revoir le dernier pli (tant qu'aucune carte du pli suivant n'est jouée) -->
+        <button
+          v-if="canReviewTrick"
+          class="review-btn"
+          @click="showLastTrick = !showLastTrick"
+        >{{ showLastTrick ? '✕ Fermer' : '↩ Revoir le pli' }}</button>
+
+        <div
+          v-if="canReviewTrick && showLastTrick"
+          class="last-trick-view"
+          @click.self="showLastTrick = false"
+        >
+          <div class="ltv-tag">Dernier pli</div>
+          <div class="ltv-cross">
+            <div
+              v-for="(t, i) in lastTrick.cards"
+              :key="t.seat"
+              class="ltv-slot"
+              :class="posClass(t.seat)"
+            >
+              <div class="ltv-card-wrap">
+                <BeloteCard :card="t.card" class="tc" :class="{ 'ltv-win': t.seat === lastTrick.winnerSeat }" />
+                <span class="ltv-order" :class="{ first: i === 0 }">{{ i + 1 }}</span>
+              </div>
+              <span class="ltv-name">{{ t.name }}</span>
+            </div>
+          </div>
+          <div class="ltv-caption">
+            Entame {{ lastTrick.cards[0].name }} · pli pour {{ nameOfSeat(lastTrick.winnerSeat) }}
+          </div>
+        </div>
+
+        <div v-if="reviewLocked && !showLastTrick" class="review-lock-banner">
+          👀 {{ reviewers.join(', ') }} regarde{{ reviewers.length > 1 ? 'nt' : '' }} le dernier pli…
+        </div>
+
+        <!-- Retourne (choix de l'atout) — dévoilée après un temps de suspense -->
+        <div
+          v-if="retourne && (gameStatus === 'bidding' || gameStatus === 'choosing_split')"
+          class="retourne-zone"
+          :class="{ revealed: retourneRevealed, 'valet-hot': valetHot }"
+        >
+          <span v-if="valetHot" class="rz-label">Valet tournant</span>
+          <div class="rz-flip">
+            <div class="rz-face rz-back"><BeloteCard face-down class="rz-card" /></div>
+            <div class="rz-face rz-front"><BeloteCard :card="retourne" class="rz-card" /></div>
+          </div>
+          <span v-if="valetHot" class="rz-label rz-label-btm">valet prenant&#8202;!</span>
         </div>
 
         <!-- À qui de jouer (+ actions) — sur le plateau -->
@@ -222,17 +281,55 @@
         </div>
 
         <!-- Ma main -->
-        <div class="my-hand" v-if="myHand.length">
+        <div class="my-hand" :class="{ dealing }" v-if="myHand.length">
           <div
             v-for="(c, i) in myHand"
             :key="cid(c)"
             class="hand-card"
             :class="{ playable: canPlay(c) }"
-            :style="{ marginLeft: i > 0 ? handOverlap : '0' }"
+            :style="{ marginLeft: i > 0 ? handOverlap : '0', '--di': i }"
             @click="playCard(c)"
           >
             <BeloteCard :card="c" class="hc" />
           </div>
+        </div>
+      </div>
+
+      <!-- Feuille de score (desktop large) -->
+      <div class="score-sheet">
+        <div class="ss-head">Feuille de score</div>
+        <div class="ss-scroll">
+          <table class="ss-table">
+            <thead>
+              <tr>
+                <th>Donne</th>
+                <th :class="{ mine: myTeam === 'A' }">{{ teamLabel('A') }}</th>
+                <th :class="{ mine: myTeam === 'B' }">{{ teamLabel('B') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(h, idx) in history" :key="idx" :class="{ 'ss-row-malus': h.malus }">
+                <td class="ss-hand">
+                  {{ h.hand }}<span
+                    class="ss-trump"
+                    :class="h.malus ? 'malus' : suitColorName(h.trump)"
+                  >{{ h.malus ? '⚠' : suitSym(h.trump) }}</span>
+                </td>
+                <td :class="{ taker: h.takerTeam === 'A', neg: h.delta.A < 0 }">{{ h.delta.A }}</td>
+                <td :class="{ taker: h.takerTeam === 'B', neg: h.delta.B < 0 }">{{ h.delta.B }}</td>
+              </tr>
+              <tr v-if="!history.length">
+                <td colspan="3" class="ss-empty">Aucune donne terminée</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total</td>
+                <td>{{ scores.A }}</td>
+                <td>{{ scores.B }}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
@@ -359,6 +456,7 @@ const seatOrder = ref([null, null, null, null])
 const scoreMode = ref('classic1000')
 const DEFAULT_SPLIT = '3-2' // le donneur peut changer à chaque donne dans le jeu
 const teamNames = ref({ A: '', B: '' }) // vide → "Nous" / "Eux" selon le point de vue
+const valetMalus = ref(false) // −100 si la main refuse un valet tournant
 
 // ---- état partie ----
 const gameStatus = ref('waiting')
@@ -381,9 +479,13 @@ const retourne = ref(null)
 const myHand = ref([])
 const myLegalCards = ref([])
 const currentTrick = ref([])
+const lastTrick = ref(null)        // dernier pli ramassé (revoir)
+const showLastTrick = ref(false)
+const reviewers = ref([])          // pseudos qui regardent le dernier pli (jeu bloqué)
 const handPoints = ref({ A: 0, B: 0 })
 const seats = ref([])
 const handResult = ref(null)
+const history = ref([])            // feuille de score : 1 entrée par donne terminée
 const matchOver = ref(false)
 const beloteSeat = ref(null)
 const beloteTeam = ref(null)
@@ -393,6 +495,33 @@ const toast = ref('')
 let toastTimer = null
 const beloteFlash = ref(null)
 let beloteFlashTimer = null
+const shameFlash = ref(null) // "valet tournant refusé"
+let shameFlashTimer = null
+
+// ---- animation : distribution des cartes + dévoilement de la retourne ----
+const dealing = ref(false)          // cartes en cours de distribution (stagger CSS)
+const retourneRevealed = ref(false) // la retourne a fini son flip
+const valetHot = ref(false)         // retourne = valet → mise en avant dorée
+let dealTimers = []
+const retourneIsJack = computed(() => retourne.value?.value === 'J')
+function clearDealTimers() { dealTimers.forEach(clearTimeout); dealTimers = [] }
+function runDealSequence() {
+  clearDealTimers()
+  valetHot.value = false
+  const reduce = typeof window !== 'undefined' && window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (reduce) {
+    dealing.value = false
+    retourneRevealed.value = true
+    valetHot.value = retourneIsJack.value
+    return
+  }
+  dealing.value = true
+  retourneRevealed.value = false
+  dealTimers.push(setTimeout(() => { dealing.value = false }, 1500))
+  dealTimers.push(setTimeout(() => { retourneRevealed.value = true }, 1050))
+  dealTimers.push(setTimeout(() => { valetHot.value = retourneIsJack.value }, 1750))
+}
 
 // ---- fin ----
 const endWinner = ref(null)
@@ -483,6 +612,14 @@ const trickWinnerSeat = computed(() => {
   return best.seat
 })
 
+const canReviewTrick = computed(() =>
+  gameStatus.value === 'playing' && !currentTrick.value.length && !!lastTrick.value
+)
+const reviewLocked = computed(() => reviewers.value.length > 0)
+
+// prévient le serveur quand on ouvre / ferme le dernier pli (bloque le jeu pour tous)
+watch(showLastTrick, (v) => { act('review', { open: v }) })
+
 const recapTitle = computed(() => {
   const o = handResult.value?.outcome
   if (o === 'made') return 'Contrat réussi'
@@ -541,7 +678,7 @@ function seatAtPos(pos) {
 }
 
 function canPlay(c) {
-  return gameStatus.value === 'playing' && isMyTurn.value && legalSet.value.has(cid(c))
+  return gameStatus.value === 'playing' && isMyTurn.value && !reviewLocked.value && legalSet.value.has(cid(c))
 }
 
 // ---- actions ----
@@ -564,6 +701,7 @@ function startGame() {
     options: {
       scoreMode: scoreMode.value,
       defaultSplit: DEFAULT_SPLIT,
+      valetMalus: valetMalus.value,
       teamNames: { A: teamNames.value.A.trim(), B: teamNames.value.B.trim() },
     },
   })
@@ -597,6 +735,21 @@ watch(allConnectedPlayers, (list) => {
   }
 })
 
+// Rejoue l'animation de donne + dévoilement de la retourne à chaque nouvelle distribution
+watch(
+  () => `${gameStatus.value}|${phase.value}`,
+  (now, prev) => {
+    const freshDeal =
+      gameStatus.value === 'bidding' && phase.value === 'bid1' &&
+      !/^(bidding|playing)/.test(prev || '')
+    if (freshDeal) { runDealSequence(); return }
+    // hors distribution initiale (2ᵉ tour, reconnexion en cours d'enchères…) : rien à cacher
+    clearDealTimers()
+    retourneRevealed.value = true
+    valetHot.value = retourneIsJack.value
+  }
+)
+
 // ---- socket ----
 onMounted(() => {
   const sendName = () => {
@@ -622,6 +775,7 @@ onMounted(() => {
     if (key === 'scoreMode') scoreMode.value = value
     if (key === 'teamNameA') teamNames.value = { ...teamNames.value, A: value || '' }
     if (key === 'teamNameB') teamNames.value = { ...teamNames.value, B: value || '' }
+    if (key === 'valetMalus') valetMalus.value = !!value
   })
 
   socket.on('game_started', () => { gameLogs.value = [] })
@@ -647,13 +801,18 @@ onMounted(() => {
     myHand.value = d.myHand || []
     myLegalCards.value = d.myLegalCards || []
     currentTrick.value = d.currentTrick || []
+    lastTrick.value = d.lastTrick || null
+    reviewers.value = d.reviewers || []
+    if (currentTrick.value.length || !lastTrick.value) showLastTrick.value = false
     handPoints.value = d.handPoints || { A: 0, B: 0 }
     seats.value = d.seats || []
     beloteSeat.value = d.beloteSeat ?? null
     beloteTeam.value = d.beloteTeam ?? null
     handResult.value = d.handResult || null
+    history.value = d.history || []
     matchOver.value = !!d.matchOver
     if (d.scoreMode) scoreMode.value = d.scoreMode
+    if (typeof d.valetMalus === 'boolean') valetMalus.value = d.valetMalus
     if (d.teamNames) teamNames.value = { A: d.teamNames.A || '', B: d.teamNames.B || '' }
   })
 
@@ -666,6 +825,13 @@ onMounted(() => {
     beloteFlash.value = { word, playerName, suit }
     clearTimeout(beloteFlashTimer)
     beloteFlashTimer = setTimeout(() => { beloteFlash.value = null }, 2600)
+  })
+
+  socket.on('belote_valet_shame', ({ name, suit, scores: sc }) => {
+    if (sc) scores.value = sc
+    shameFlash.value = { name, suit }
+    clearTimeout(shameFlashTimer)
+    shameFlashTimer = setTimeout(() => { shameFlash.value = null }, 5000)
   })
 
   socket.on('game_over', (d) => {
@@ -681,6 +847,9 @@ onMounted(() => {
 onUnmounted(() => {
   clearTimeout(toastTimer)
   clearTimeout(beloteFlashTimer)
+  clearTimeout(shameFlashTimer)
+  clearDealTimers()
+  if (showLastTrick.value) act('review', { open: false })
   socket.disconnect()
 })
 </script>
@@ -710,6 +879,38 @@ onUnmounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .belote-flash, .belote-flash-word, .belote-flash-who, .bf-halo { animation: none !important; opacity: 1 !important; }
   .bf-halo { opacity: 0.12 !important; }
+}
+
+/* "valet tournant refusé" — la honte (malus −100) */
+.shame-flash {
+  position: fixed; inset: 0; z-index: 260; pointer-events: none; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 42%, rgba(120,16,24,0.86), rgba(30,6,10,0.9));
+  animation: sfFade 5s ease forwards, sfShake 0.5s ease-in-out 4;
+}
+.sf-emoji { font-size: clamp(3.4rem, 16vw, 7rem); line-height: 1; animation: sfNo 0.6s ease-in-out 6; }
+.sf-finger { position: absolute; font-size: 34vmin; opacity: 0.12; animation: bfHalo 5s ease-out forwards; }
+.sf-title {
+  position: relative; margin-top: 6px; font-size: clamp(2rem, 8.5vw, 4rem); font-weight: 900;
+  letter-spacing: 3px; text-transform: uppercase; color: #ff6b6b; text-shadow: 0 6px 26px rgba(0,0,0,0.75);
+  animation: bfPop 0.5s cubic-bezier(0.2,1.5,0.35,1);
+}
+.sf-who {
+  position: relative; margin-top: 12px; font-size: 1.35rem; font-weight: 800; color: #ffe3e3;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.6); animation: bfPop 0.5s 0.08s cubic-bezier(0.2,1.5,0.35,1) backwards;
+}
+.sf-suit.red { color: #ff8a8a; } .sf-suit.black { color: #fff; }
+.sf-malus {
+  position: relative; margin-top: 8px; font-size: 1.05rem; font-weight: 900; letter-spacing: 1px;
+  text-transform: uppercase; color: #fff; background: rgba(255,80,80,0.22); border: 1px solid rgba(255,120,120,0.6);
+  padding: 4px 14px; border-radius: 999px; animation: bfPop 0.5s 0.16s cubic-bezier(0.2,1.5,0.35,1) backwards;
+}
+@keyframes sfFade { 0%{opacity:0} 7%{opacity:1} 84%{opacity:1} 100%{opacity:0} }
+@keyframes sfShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-9px)} 75%{transform:translateX(9px)} }
+@keyframes sfNo { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-16deg)} 75%{transform:rotate(16deg)} }
+@media (prefers-reduced-motion: reduce) {
+  .shame-flash, .sf-emoji, .sf-finger, .sf-title, .sf-who, .sf-malus { animation: none !important; opacity: 1 !important; }
+  .sf-finger { opacity: 0.1 !important; }
 }
 
 /* Badge persistant "belote" sur le joueur concerné */
@@ -747,7 +948,11 @@ onUnmounted(() => {
 .team-names input:focus { outline: none; border-color: #4fd08a; }
 .tn-readonly { color: #a7d9c1; margin: 12px 0 0 0; font-size: 0.85rem; }
 .opt-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 0.8rem; color: #6a9d84; text-transform: uppercase; letter-spacing: 0.5px; }
+.opt-check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; font-size: 0.82rem; color: #a7d9c1; cursor: pointer; }
+.opt-check input { margin-top: 2px; accent-color: #4fd08a; flex-shrink: 0; }
+.opt-check small { color: #6a9d84; font-size: 0.74rem; }
 .opt-readonly { color: #a7d9c1; margin: 4px 0; font-size: 0.9rem; }
+.opt-readonly.small { font-size: 0.8rem; color: #d9b48a; }
 .opt-hint { color: #6a9d84; font-size: 0.78rem; margin: 8px 0 0 0; line-height: 1.4; }
 
 .btn-primary { background: linear-gradient(135deg, #1f9c5f, #157a49); color: #eafff3; border: none; padding: 14px 28px; border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s; }
@@ -819,10 +1024,87 @@ onUnmounted(() => {
 .tc { width: 100px; height: 146px; border-radius: 7px; transition: box-shadow 0.2s ease; }
 .trick-card.winning .tc { box-shadow: 0 0 0 3px #4fd08a, 0 0 20px rgba(79,208,138,0.55); }
 
+/* Revoir le dernier pli */
+.review-btn {
+  position: absolute; left: 10px; top: 10px; z-index: 7;
+  background: rgba(6,20,14,0.82); color: #d6f0e2; border: 1px solid rgba(79,208,138,0.45);
+  border-radius: 999px; padding: 7px 14px; font-family: 'Outfit', sans-serif; font-weight: 700;
+  font-size: 0.82rem; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.45); transition: 0.15s;
+}
+.review-btn:hover { border-color: #4fd08a; background: rgba(11,32,22,0.95); }
+.last-trick-view {
+  position: absolute; inset: 0; z-index: 6; overflow: hidden; container-type: size;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 14px 10px;
+  background: rgba(4,12,9,0.8); backdrop-filter: blur(2px); animation: bfPop 0.22s ease;
+}
+.ltv-tag, .ltv-caption { flex-shrink: 0; text-align: center; }
+.ltv-tag { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; color: #a7d9c1; }
+.ltv-caption { font-size: 0.95rem; font-weight: 800; color: #d6f0e2; }
+/* croix centrée : grille 3×3, aucune superposition ; les cartes suivent la hauteur DU CADRE
+   (cqh) pour ne jamais déborder — pas de scroll. Le padding laisse la place aux pastilles. */
+.ltv-cross {
+  display: grid; grid-template-columns: repeat(3, auto); grid-template-rows: repeat(3, auto);
+  gap: 2px 18px; padding: 12px; justify-items: center; align-items: center; flex-shrink: 1; min-height: 0;
+}
+.ltv-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ltv-slot.top { grid-area: 1 / 2; }
+.ltv-slot.left { grid-area: 2 / 1; }
+.ltv-slot.right { grid-area: 2 / 3; }
+.ltv-slot.bottom { grid-area: 3 / 2; }
+.ltv-card-wrap { position: relative; }
+.ltv-cross .tc { width: auto; aspect-ratio: 100 / 146; height: clamp(52px, calc((100cqh - 176px) / 3), 150px); }
+.ltv-cross .tc.ltv-win { box-shadow: 0 0 0 3px #4fd08a, 0 0 18px rgba(79,208,138,0.55); }
+/* numéro d'ordre de jeu (1 = celui qui a entamé) */
+.ltv-order {
+  position: absolute; top: -9px; left: -9px; z-index: 3;
+  min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.76rem; font-weight: 900; color: #0a1f16;
+  background: #a7d9c1; border: 2px solid #0a1f16; box-shadow: 0 2px 6px rgba(0,0,0,0.55);
+}
+.ltv-order.first { background: #ffe08a; box-shadow: 0 0 0 2px rgba(255,224,138,0.4), 0 2px 6px rgba(0,0,0,0.55); }
+.ltv-name {
+  font-size: 0.72rem; font-weight: 700; color: #b8e6ce; white-space: nowrap;
+  max-width: 92px; overflow: hidden; text-overflow: ellipsis;
+}
+.review-lock-banner {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 7;
+  background: rgba(6,20,14,0.9); border: 1px solid rgba(255,224,138,0.5); color: #ffe08a;
+  border-radius: 999px; padding: 6px 16px; font-size: 0.82rem; font-weight: 700;
+  white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+}
+
 /* Retourne au centre du plateau (choix de l'atout / distribution) */
-.retourne-zone { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.rz-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: #a7d9c1; font-weight: 700; }
+.retourne-zone { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; perspective: 950px; transition: transform 0.4s ease; }
+.retourne-zone.valet-hot { transform: translate(-50%, -50%) scale(1.06); }
+.rz-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px; color: #a7d9c1; font-weight: 700; transition: color 0.3s ease; }
+.retourne-zone.valet-hot .rz-label { color: #ffd76a; text-shadow: 0 0 12px rgba(255,215,106,0.6); }
+
+/* carte retournée : face cachée, puis flip 3D pour le suspense */
+.rz-flip { position: relative; width: 116px; height: 168px; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.2,0.75,0.2,1); }
+.retourne-zone.revealed .rz-flip { transform: rotateY(180deg); }
+.rz-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 8px; }
+.rz-face .rz-card { width: 100%; height: 100%; }
+.rz-front { transform: rotateY(180deg); }
 .rz-card { width: 116px; height: 168px; box-shadow: 0 8px 30px rgba(0,0,0,0.55); }
+
+/* valet tournant : on le met en avant une fois la carte révélée */
+.retourne-zone.valet-hot .rz-front { animation: valetPulse 1.4s ease-in-out infinite; border-radius: 8px; }
+.retourne-zone.valet-hot .rz-front::after {
+  content: ''; position: absolute; inset: -9px; border-radius: 13px; pointer-events: none;
+  border: 2px solid rgba(255,215,106,0.75); animation: valetRing 1.5s ease-out infinite;
+}
+.rz-label-btm { animation: bfPop 0.5s 0.05s backwards; }
+/* un peu d'air entre la carte et les libellés du valet */
+.retourne-zone.valet-hot .rz-label { margin-bottom: 6px; }
+.retourne-zone.valet-hot .rz-label-btm { margin-bottom: 0; margin-top: 6px; }
+@keyframes valetPulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(255,215,106,0.9), 0 0 20px rgba(255,215,106,0.45); }
+  50%     { box-shadow: 0 0 0 4px rgba(255,215,106,1),   0 0 42px rgba(255,215,106,0.8); }
+}
+@keyframes valetRing { 0% { transform: scale(0.82); opacity: 0.85; } 100% { transform: scale(1.28); opacity: 0; } }
 
 /* Bandeau "à qui de jouer" (+ actions) en bas du plateau */
 .felt-panel {
@@ -871,6 +1153,29 @@ onUnmounted(() => {
 .hand-card.playable { cursor: pointer; box-shadow: 0 0 0 2px rgba(79,208,138,0.55); }
 .hand-card.playable:hover { transform: translateY(-16px); box-shadow: 0 0 0 2px #4fd08a, 0 12px 24px rgba(0,0,0,0.5); }
 @media (prefers-reduced-motion: reduce) { .hand-card, .hand-card.playable:hover { transform: none !important; } }
+
+/* distribution : les cartes arrivent une à une */
+.my-hand.dealing .hand-card {
+  animation: cardDeal 0.4s cubic-bezier(0.2,0.75,0.3,1) backwards;
+  animation-delay: calc(var(--di, 0) * 70ms);
+}
+.hidden-hand.dealing .mini-card {
+  animation: miniDeal 0.32s ease backwards;
+  animation-delay: calc(var(--di, 0) * 50ms + 100ms);
+}
+@keyframes cardDeal {
+  from { opacity: 0; transform: translate(-24px, -120px) rotate(-14deg) scale(0.72); }
+  to   { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+}
+@keyframes miniDeal {
+  from { opacity: 0; transform: scale(0.35); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .my-hand.dealing .hand-card, .hidden-hand.dealing .mini-card,
+  .retourne-zone.revealed .rz-flip,
+  .retourne-zone.valet-hot .rz-front, .retourne-zone.valet-hot .rz-front::after { animation: none !important; }
+}
 
 /* journal */
 .log-panel { background: #071811; border-top: 1px solid rgba(79,208,138,0.12); height: 92px; flex-shrink: 0; overflow: hidden; }
@@ -931,14 +1236,75 @@ onUnmounted(() => {
   .seat-nom { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .trick-zone { top: max(120px, 30%); bottom: 8%; width: min(92%, 320px); }
+  .last-trick-view { padding: 10px 8px; gap: 6px; }
+  .ltv-cross { gap: 2px 10px; padding: 11px; }
+  .ltv-cross .tc { height: clamp(48px, calc((100cqh - 150px) / 3), 116px); }
+  .ltv-slot { gap: 3px; }
+  .ltv-name { font-size: 0.64rem; max-width: 74px; }
+  .ltv-caption { font-size: 0.82rem; }
   .trick-card.top { top: 0; }
   .trick-card.left { left: 0; } .trick-card.right { right: 0; }
   .tc { width: 60px; height: 88px; }
+  .rz-flip { width: 84px; height: 122px; }
   .rz-card { width: 84px; height: 122px; }
   .hand-card .hc { width: 74px; height: 108px; }
 
   .hm-cap { flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
   .recap-table th, .recap-table td { padding: 7px 8px; font-size: 0.9rem; }
   .recap-table td:first-child, .recap-table th:first-child { font-size: 0.82rem; white-space: normal; }
+}
+
+/* Feuille de score : masquée par défaut, affichée en colonne de droite sur desktop large
+   (le tapis y est très étiré, ça comble l'espace vide). Le journal reste en bas. */
+.score-sheet { display: none; }
+@media (min-width: 900px) {
+  .table-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+  .topbar    { grid-column: 1 / -1; grid-row: 1; }
+  .felt      { grid-column: 1; grid-row: 2; margin: 14px 10px 8px 14px; }
+  .my-zone   { grid-column: 1; grid-row: 3; }
+  .log-panel { grid-column: 1 / -1; grid-row: 4; }
+
+  .score-sheet {
+    grid-column: 2; grid-row: 2 / 4;
+    display: flex; flex-direction: column;
+    width: clamp(230px, 20vw, 310px);
+    background: #0c281c; border-left: 1px solid rgba(79,208,138,0.18);
+    overflow: hidden;
+  }
+  .ss-head {
+    flex-shrink: 0; padding: 12px 14px 9px; font-weight: 800; font-size: 0.82rem;
+    color: #a7d9c1; text-transform: uppercase; letter-spacing: 1.5px;
+    border-bottom: 1px solid rgba(79,208,138,0.18);
+  }
+  .ss-scroll { flex: 1; overflow: auto; }
+  .ss-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .ss-table th, .ss-table td { padding: 6px 12px; text-align: right; white-space: nowrap; }
+  .ss-table th:first-child, .ss-table td:first-child { text-align: left; }
+  .ss-table thead th {
+    position: sticky; top: 0; z-index: 1; background: #0c281c;
+    color: #8fc4ab; font-weight: 700; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(79,208,138,0.25);
+  }
+  .ss-table thead th.mine { color: #4fd08a; }
+  .ss-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.025); }
+  .ss-table tbody td { color: #cfeadd; border-bottom: 1px solid rgba(79,208,138,0.06); }
+  .ss-hand { color: #7fb99e; font-weight: 700; }
+  .ss-trump { margin-left: 5px; font-size: 0.95em; }
+  .ss-trump.red { color: #ff8a8a; }
+  .ss-trump.black { color: #e6f2ee; }
+  .ss-trump.malus { color: #ffb44f; }
+  .ss-row-malus td { color: #ffb44f; font-style: italic; }
+  .ss-table tbody td.neg { color: #ff8a8a; font-weight: 800; }
+  .ss-table tbody td.taker { font-weight: 800; color: #eafff3; }
+  .ss-empty { text-align: center; color: #6a9d84; padding: 16px; }
+  .ss-table tfoot td {
+    position: sticky; bottom: 0; background: #0f2c20;
+    color: #eafff3; font-weight: 900; font-size: 0.92rem;
+    border-top: 1px solid rgba(79,208,138,0.35);
+  }
 }
 </style>
