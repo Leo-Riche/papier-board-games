@@ -84,8 +84,20 @@ const generateDeck = (withExtensions = true) => {
     }
     // 15 joker : joué comme un 15 vert/jaune/violet.
     deck.push({ id: 'joker15', type: 'joker15' });
-    // Nouvelle pirate : Mary Throne (pas de pouvoir avancé ici).
+    // Nouvelle pirate : Mary Throne.
     deck.push({ id: 'pirate-6', type: 'pirate', name: 'Mary Throne' });
+
+    // ── Nouvelles cartes additionnelles ──
+    // Second : bat tout sauf SK et Sirènes (+30 pts si capturé par SK ou Sirène).
+    deck.push({ id: 'second', type: 'second' });
+    // Raie tachetée : la carte la plus basse remporte le pli.
+    deck.push({ id: 'stingray', type: 'stingray' });
+    // Casier de Davy Jones : détruit tous les léviathans (+20/léviathan au gagnant).
+    deck.push({ id: 'davy-jones', type: 'davy_jones' });
+    // Supplice de la planche : retire un Pirate du pli.
+    deck.push({ id: 'plank', type: 'plank' });
+    // Dernière salve : le joueur doit jouer une 2ᵉ carte ; ne participe pas au dernier pli.
+    deck.push({ id: 'last-volley', type: 'last_volley' });
   }
 
   return deck;
@@ -137,6 +149,8 @@ class SkullKing {
       alliances: [],              // [{lootPlayerIndex, winnerIndex}] de la manche
       roundResults: null,         // récap de fin de manche
       history: [],                // [{round, perPlayer:[{name,bid,tricks,roundScore,total}]}]
+      awaitingVolleyPlay: false,  // true quand la Dernière salve attend la 2ᵉ carte
+      lastVolleyPlayerIdx: null,  // index joueur qui a joué la Dernière salve
     };
   }
 
@@ -183,6 +197,8 @@ class SkullKing {
     this.state.lastTrick = null;
     this.state.alliances = [];
     this.state.roundResults = null;
+    this.state.awaitingVolleyPlay = false;
+    this.state.lastVolleyPlayerIdx = null;
 
     // Le donneur change chaque manche ; le joueur à sa gauche entame.
     this.state.dealerIndex = (this.state.dealerIndex + 1) % n;
@@ -290,6 +306,12 @@ class SkullKing {
 
   // Liste des ids de cartes jouables pour un joueur donné (selon "suivre la couleur").
   legalCardIds(player) {
+    if (player.hand.length === 0) return [];
+    // Pendant la 2ᵉ carte de la Dernière salve, seul ce joueur peut jouer.
+    if (this.state.awaitingVolleyPlay) {
+      const playerIdx = this.state.players.findIndex(p => p.id === player.id);
+      if (playerIdx !== this.state.lastVolleyPlayerIdx) return [];
+    }
     const leadSuit = this.getLeadSuit();
     if (!leadSuit) return player.hand.map(c => c.id);
 
@@ -347,36 +369,85 @@ class SkullKing {
       tigressAsPirate,
     });
 
-    if (this.state.trick.length === this.state.players.length) {
+    const n = this.state.players.length;
+
+    // ── Dernière salve : 2ᵉ carte du joueur ──
+    if (this.state.awaitingVolleyPlay) {
+      this.state.awaitingVolleyPlay = false;
+      this.state.lastVolleyPlayerIdx = null;
+      this.resolveTrick();
+      return;
+    }
+
+    // ── Vérifier si la Dernière salve a été jouée et si tous les autres ont joué ──
+    const volleyPlay = this.state.trick.find(p => p.card.type === 'last_volley');
+    if (volleyPlay) {
+      const othersPlayed = this.state.players.every((p, idx) => {
+        if (idx === volleyPlay.playerIndex) return true;
+        return this.state.trick.some(t => t.playerIndex === idx) || p.hand.length === 0;
+      });
+      if (othersPlayed) {
+        this.state.awaitingVolleyPlay = true;
+        this.state.lastVolleyPlayerIdx = volleyPlay.playerIndex;
+        this.state.currentTurnIndex = volleyPlay.playerIndex;
+        this._startTurnTimer();
+        this.broadcastState();
+        return;
+      }
+    }
+
+    // ── Vérifier si le pli est complet (tous ont joué OU n'ont plus de cartes) ──
+    const everyoneActed = this.state.players.every((p, idx) =>
+      this.state.trick.some(t => t.playerIndex === idx) || p.hand.length === 0
+    );
+    if (everyoneActed) {
       this.resolveTrick();
     } else {
-      this.state.currentTurnIndex = (this.state.currentTurnIndex + 1) % this.state.players.length;
+      // Passer au prochain joueur actif (avec des cartes, n'ayant pas encore joué ce pli)
+      let nextIdx = (this.state.currentTurnIndex + 1) % n;
+      for (let i = 0; i < n; i++) {
+        const np = this.state.players[nextIdx];
+        const alreadyPlayed = this.state.trick.some(t => t.playerIndex === nextIdx);
+        if (np.hand.length > 0 && !alreadyPlayed) break;
+        nextIdx = (nextIdx + 1) % n;
+      }
+      this.state.currentTurnIndex = nextIdx;
       this._startTurnTimer();
       this.broadcastState();
     }
   }
 
-  // Résolution "normale" (sans kraken/baleine). Renvoie l'index gagnant dans `plays`.
+  // Résolution "normale" (sans léviathans). Renvoie l'index gagnant dans `plays`.
   _resolveNormal(plays) {
     let skIdx = -1;
+    let secondIdx = -1;
     const pirateIdxs = [];
     const mermaidIdxs = [];
 
     plays.forEach((p, i) => {
       const t = effectiveType(p);
       if (t === 'skullking') skIdx = i;
+      else if (p.card.type === 'second') secondIdx = i;
       else if (t === 'pirate') pirateIdxs.push(i);
       else if (t === 'mermaid') mermaidIdxs.push(i);
     });
 
-    const hasCharacter = skIdx !== -1 || pirateIdxs.length || mermaidIdxs.length;
+    const hasCharacter = skIdx !== -1 || secondIdx !== -1 || pirateIdxs.length || mermaidIdxs.length;
     if (hasCharacter) {
-      // Cycle : Skull King > Pirates > Sirènes > Skull King.
-      // Cas explicite : Pirate + Skull King + Sirène ⇒ la sirène gagne.
+      // SK + Sirène → Sirène gagne.
       if (skIdx !== -1 && mermaidIdxs.length) return mermaidIdxs[0];
+      // SK seul → SK gagne (bat Second et Pirates).
       if (skIdx !== -1) return skIdx;
+      // Sirène bat Second (et donc si Second présent, Sirène gagne sur Pirates aussi).
+      if (mermaidIdxs.length && secondIdx !== -1) return mermaidIdxs[0];
+      // Pirates battent Sirènes (règle de base, sans Second).
+      if (pirateIdxs.length && mermaidIdxs.length) return pirateIdxs[0];
+      // Sirène seule.
+      if (mermaidIdxs.length) return mermaidIdxs[0];
+      // Second bat les Pirates.
+      if (secondIdx !== -1) return secondIdx;
+      // Pirate (1ᵉʳ joué gagne).
       if (pirateIdxs.length) return pirateIdxs[0];
-      return mermaidIdxs[0];
     }
 
     // Uniquement des cartes numérotées et/ou fuites/butins/tigresse-fuite.
@@ -399,59 +470,95 @@ class SkullKing {
     return best;
   }
 
-  // Résout le pli complet (gère kraken / baleine). Renvoie
-  // { destroyed, winnerIndex, leadNextIndex } en index *joueur*.
+  // Résout le pli complet. Renvoie { destroyed, winnerPlayerIndex, leadNextIndex, effectivePlays, davyJonesBonus }.
   _resolveTrickPlays(plays) {
-    const krakenPos = plays.findIndex(p => p.card.type === 'kraken');
-    const whalePos = plays.findIndex(p => p.card.type === 'whale');
+    const LEVIATHANS = ['kraken', 'whale', 'stingray'];
 
-    let effect = null;
-    if (krakenPos !== -1 && whalePos !== -1) {
-      effect = krakenPos > whalePos ? 'kraken' : 'whale'; // la 2ᵉ jouée l'emporte
-    } else if (krakenPos !== -1) effect = 'kraken';
-    else if (whalePos !== -1) effect = 'whale';
+    // ── Étape 1 : Casier de Davy Jones (détruit tous les léviathans du pli) ──
+    const davyJonesPlay = plays.find(p => p.card.type === 'davy_jones');
+    if (davyJonesPlay) {
+      const destroyed = plays.filter(p => LEVIATHANS.includes(p.card.type));
+      const davyJonesBonus = destroyed.length * 20;
+      const remaining = plays.filter(p => !LEVIATHANS.includes(p.card.type) && p.card.type !== 'davy_jones');
+      const all = plays.filter(p => !LEVIATHANS.includes(p.card.type));
+      if (remaining.length === 0) {
+        return { destroyed: false, winnerPlayerIndex: davyJonesPlay.playerIndex, leadNextIndex: davyJonesPlay.playerIndex, effectivePlays: all, davyJonesBonus };
+      }
+      const w = this._resolveNormal(remaining);
+      const winner = remaining[w];
+      return { destroyed: false, winnerPlayerIndex: winner.playerIndex, leadNextIndex: winner.playerIndex, effectivePlays: all, davyJonesBonus };
+    }
 
-    if (effect === 'kraken') {
-      // Pli détruit ; le joueur qui aurait gagné entame le suivant.
-      const sub = plays.filter(p => p.card.type !== 'kraken' && p.card.type !== 'whale');
-      let leadNextIndex;
-      if (sub.length === 0) {
-        leadNextIndex = plays[krakenPos].playerIndex;
-      } else {
+    // ── Étape 2 : Supplice de la planche (retire un Pirate avant résolution) ──
+    let activePlays = plays.filter(p => p.card.type !== 'last_volley');
+    const plankPlay = activePlays.find(p => p.card.type === 'plank');
+    if (plankPlay) {
+      const piratePlay = activePlays.find(p => p !== plankPlay && effectiveType(p) === 'pirate');
+      activePlays = activePlays.filter(p => p !== plankPlay && p !== piratePlay);
+    }
+
+    // ── Étape 3 : dernier léviathan joué détermine l'effet ──
+    let lastLeviathan = null;
+    let lastLeviathanPlayerIndex = -1;
+    plays.forEach(p => {
+      if (LEVIATHANS.includes(p.card.type)) {
+        lastLeviathan = p.card.type;
+        lastLeviathanPlayerIndex = p.playerIndex;
+      }
+    });
+
+    if (lastLeviathan === 'kraken') {
+      const sub = activePlays.filter(p => !LEVIATHANS.includes(p.card.type));
+      let leadNextIndex = lastLeviathanPlayerIndex;
+      if (sub.length > 0) {
         const w = this._resolveNormal(sub);
         leadNextIndex = sub[w].playerIndex;
       }
-      return { destroyed: true, winnerIndex: -1, leadNextIndex };
+      return { destroyed: true, winnerPlayerIndex: -1, leadNextIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
     }
 
-    if (effect === 'whale') {
-      // Cartes spéciales détruites ; les numéros comptent par valeur, couleur ignorée.
-      const numberIdxs = plays
-        .map((p, i) => (p.card.type === 'number' ? i : -1))
-        .filter(i => i !== -1);
-      if (numberIdxs.length === 0) {
-        return { destroyed: true, winnerIndex: -1, leadNextIndex: plays[whalePos].playerIndex };
+    if (lastLeviathan === 'whale') {
+      const numberPlays = activePlays.filter(p => p.card.type === 'number');
+      if (numberPlays.length === 0) {
+        return { destroyed: true, winnerPlayerIndex: -1, leadNextIndex: lastLeviathanPlayerIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
       }
-      let best = numberIdxs[0];
-      for (const i of numberIdxs) {
-        if (plays[i].card.value > plays[best].card.value) best = i; // égalité → 1ʳᵉ jouée
+      let best = numberPlays[0];
+      for (const p of numberPlays) {
+        if (p.card.value > best.card.value) best = p;
       }
-      return { destroyed: false, winnerIndex: best, leadNextIndex: plays[best].playerIndex };
+      return { destroyed: false, winnerPlayerIndex: best.playerIndex, leadNextIndex: best.playerIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
     }
 
-    const w = this._resolveNormal(plays);
-    return { destroyed: false, winnerIndex: w, leadNextIndex: plays[w].playerIndex };
+    if (lastLeviathan === 'stingray') {
+      // La carte la plus BASSE (parmi les numéros) remporte le pli ; égalité → 1ʳᵉ jouée.
+      const numberPlays = activePlays.filter(p => p.card.type === 'number');
+      if (numberPlays.length === 0) {
+        return { destroyed: false, winnerPlayerIndex: plays[0].playerIndex, leadNextIndex: plays[0].playerIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
+      }
+      let best = numberPlays[0];
+      for (const p of numberPlays) {
+        if (p.card.value < best.card.value) best = p;
+      }
+      return { destroyed: false, winnerPlayerIndex: best.playerIndex, leadNextIndex: best.playerIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
+    }
+
+    // ── Résolution normale ──
+    const w = this._resolveNormal(activePlays);
+    const winner = activePlays[w];
+    return { destroyed: false, winnerPlayerIndex: winner.playerIndex, leadNextIndex: winner.playerIndex, effectivePlays: activePlays, davyJonesBonus: 0 };
   }
 
   // Points bonus capturés par le gagnant d'un pli.
-  _computeBonus(plays, winnerLocalIdx) {
-    const winnerPlay = plays[winnerLocalIdx];
+  // allPlays = pli complet (pour les 14), effectivePlays = après retrait léviathans/planche.
+  _computeBonus(allPlays, effectivePlays, winnerPlayerIndex) {
+    const winnerPlay = effectivePlays.find(p => p.playerIndex === winnerPlayerIndex);
+    if (!winnerPlay) return { bonus: 0, details: [] };
     const winnerType = effectiveType(winnerPlay);
     let bonus = 0;
     const details = [];
 
-    // 14 capturés (la carte 0/14 ne rapporte aucun bonus)
-    for (const p of plays) {
+    // 14 capturés dans le pli entier (la carte 0/14 ne rapporte aucun bonus)
+    for (const p of allPlays) {
       if (p.card.type === 'number' && p.card.value === 14 && !p.card.zeroFourteen) {
         const pts = p.card.suit === 'black' ? 20 : 10;
         bonus += pts;
@@ -459,22 +566,23 @@ class SkullKing {
       }
     }
 
-    // Captures de personnages
-    const mermaidCount = plays.filter(p => effectiveType(p) === 'mermaid').length;
-    const pirateCount = plays.filter(p => effectiveType(p) === 'pirate').length;
-    const hasSK = plays.some(p => effectiveType(p) === 'skullking');
+    // Captures de personnages (sur effectivePlays pour tenir compte de la Planche)
+    const mermaidCount = effectivePlays.filter(p => effectiveType(p) === 'mermaid').length;
+    const pirateCount  = effectivePlays.filter(p => effectiveType(p) === 'pirate').length;
+    const secondCount  = effectivePlays.filter(p => p.card.type === 'second').length;
+    const hasSK        = effectivePlays.some(p => effectiveType(p) === 'skullking');
 
     if (winnerType === 'pirate' && mermaidCount > 0) {
       bonus += 20 * mermaidCount;
       details.push(`+${20 * mermaidCount} (sirène capturée)`);
     }
-    if (winnerType === 'skullking' && pirateCount > 0) {
-      bonus += 30 * pirateCount;
-      details.push(`+${30 * pirateCount} (pirate capturé)`);
+    if (winnerType === 'skullking') {
+      if (pirateCount > 0) { bonus += 30 * pirateCount; details.push(`+${30 * pirateCount} (pirate capturé)`); }
+      if (secondCount > 0) { bonus += 30 * secondCount; details.push(`+${30 * secondCount} (Second capturé)`); }
     }
-    if (winnerType === 'mermaid' && hasSK) {
-      bonus += 40;
-      details.push('+40 (Skull King capturé)');
+    if (winnerType === 'mermaid') {
+      if (hasSK) { bonus += 40; details.push('+40 (Skull King capturé)'); }
+      if (secondCount > 0) { bonus += 30 * secondCount; details.push(`+${30 * secondCount} (Second capturé)`); }
     }
 
     return { bonus, details };
@@ -489,13 +597,15 @@ class SkullKing {
     let bonusInfo = { bonus: 0, details: [] };
 
     if (!result.destroyed) {
-      const winnerPlay = plays[result.winnerIndex];
-      winnerPlayerIndex = winnerPlay.playerIndex;
+      winnerPlayerIndex = result.winnerPlayerIndex;
       const winner = this.state.players[winnerPlayerIndex];
       winner.tricksWon += 1;
 
-      bonusInfo = this._computeBonus(plays, result.winnerIndex);
-      winner.roundBonus += bonusInfo.bonus;
+      bonusInfo = this._computeBonus(plays, result.effectivePlays, winnerPlayerIndex);
+      winner.roundBonus += bonusInfo.bonus + result.davyJonesBonus;
+
+      const allDetails = [...bonusInfo.details];
+      if (result.davyJonesBonus > 0) allDetails.push(`+${result.davyJonesBonus} (Casier de Davy Jones)`);
 
       // Cartes 7/8 additionnelles : ±5 au gagnant (appliqué en fin de manche si le pari est juste).
       for (const pl of plays) {
@@ -509,8 +619,11 @@ class SkullKing {
         }
       });
 
+      const bonusStr = allDetails.length ? ` (${allDetails.join(', ')})` : '';
       this.io.to(this.roomCode).emit('action_log',
-        `🏴‍☠️ ${winner.name} remporte le pli${bonusInfo.bonus ? ` (${bonusInfo.details.join(', ')})` : ''}.`);
+        `🏴‍☠️ ${winner.name} remporte le pli${bonusStr}.`);
+
+      bonusInfo.details = allDetails;
     } else {
       this.io.to(this.roomCode).emit('action_log',
         `🐙 Le pli est détruit ! Personne ne le remporte.`);
@@ -540,9 +653,14 @@ class SkullKing {
       return;
     }
 
-    // Le gagnant (ou le "qui aurait gagné") entame le pli suivant.
-    this.state.trickLeaderIndex = result.leadNextIndex % n;
-    this.state.currentTurnIndex = this.state.trickLeaderIndex;
+    // Le gagnant (ou le "qui aurait gagné") entame le pli suivant (en sautant les mains vides).
+    let leader = result.leadNextIndex % n;
+    for (let i = 0; i < n; i++) {
+      if (this.state.players[leader].hand.length > 0) break;
+      leader = (leader + 1) % n;
+    }
+    this.state.trickLeaderIndex = leader;
+    this.state.currentTurnIndex = leader;
     this._startTurnTimer();
     this.broadcastState();
   }
@@ -675,6 +793,7 @@ class SkullKing {
         myScore: player.score,
         legalCardIds: legal,
         resolving: this.state.resolving,
+        awaitingVolleyPlay: this.state.awaitingVolleyPlay,
         isMyTurn: this.state.phase === 'playing' && !this.state.resolving
           && this.state.players[this.state.currentTurnIndex]?.id === player.id,
 

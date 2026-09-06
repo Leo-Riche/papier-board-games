@@ -58,15 +58,20 @@ const SUIT_ICONS = { green: '🦜', yellow: '🪙', purple: '💎', black: '🏴
 const SUIT_CLASS = { green: 'c-green', yellow: 'c-yellow', purple: 'c-purple', black: 'c-black' }
 
 const SPECIAL = {
-  escape:    { icon: '🏳️', name: 'Fuite' },
-  pirate:    { icon: '⚔️', name: 'Pirate' },
-  tigress:   { icon: '🐯', name: 'Tigresse' },
-  skullking: { icon: '💀', name: 'Skull King' },
-  mermaid:   { icon: '🧜‍♀️', name: 'Sirène' },
-  loot:      { icon: '💰', name: 'Butin' },
-  kraken:    { icon: '🐙', name: 'Kraken' },
-  whale:     { icon: '🐋', name: 'Baleine' },
-  joker15:   { icon: '🃏', name: '15 Joker' },
+  escape:     { icon: '🏳️', name: 'Fuite' },
+  pirate:     { icon: '⚔️', name: 'Pirate' },
+  tigress:    { icon: '🐯', name: 'Tigresse' },
+  skullking:  { icon: '💀', name: 'Skull King' },
+  mermaid:    { icon: '🧜‍♀️', name: 'Sirène' },
+  loot:       { icon: '💰', name: 'Butin' },
+  kraken:     { icon: '🐙', name: 'Kraken' },
+  whale:      { icon: '🐋', name: 'Baleine' },
+  joker15:    { icon: '🃏', name: '15 Joker' },
+  second:     { icon: '🗡️', name: 'Second' },
+  stingray:   { icon: '🦈', name: 'Raie tachetée' },
+  davy_jones: { icon: '⚰️', name: 'Casier de Davy Jones' },
+  plank:      { icon: '🪵', name: 'Supplice de la planche' },
+  last_volley:{ icon: '💥', name: 'Dernière salve' },
 }
 
 const isSpecial = computed(() => props.card.type !== 'number')
@@ -128,10 +133,20 @@ const tigressMode = computed(() => {
 .sk-card.c-tigress   { background: linear-gradient(165deg, #33260e, #1a1305); border-color: #e67e22; }
 .sk-card.c-escape    { background: linear-gradient(165deg, #2c2c34, #16161a); border-color: #95a5a6; }
 .sk-card.c-loot      { background: linear-gradient(165deg, #33280e, #1a1405); border-color: #f1c40f; }
-.sk-card.c-kraken    { background: linear-gradient(165deg, #1a1033, #0a0618); border-color: #8e44ad; }
-.sk-card.c-whale     { background: linear-gradient(165deg, #0e2333, #06121c); border-color: #5dade2; }
-.sk-card.c-joker15   { background: linear-gradient(165deg, #2a1433, #140a1c); border-color: #d4ac0d; }
+.sk-card.c-kraken     { background: linear-gradient(165deg, #1a1033, #0a0618); border-color: #8e44ad; }
+.sk-card.c-whale      { background: linear-gradient(165deg, #0e2333, #06121c); border-color: #5dade2; }
+.sk-card.c-joker15    { background: linear-gradient(165deg, #2a1433, #140a1c); border-color: #d4ac0d; }
 .sk-card.c-joker15 .sk-special-name { color: #f1c40f; }
+.sk-card.c-second      { background: linear-gradient(165deg, #2a1f10, #140f05); border-color: #e67e22; }
+.sk-card.c-second .sk-special-name { color: #f0a85a; }
+.sk-card.c-stingray    { background: linear-gradient(165deg, #0e2228, #060f14); border-color: #1abc9c; }
+.sk-card.c-stingray .sk-special-name { color: #76d7c4; }
+.sk-card.c-davy_jones  { background: linear-gradient(165deg, #0d0d0d, #050505); border-color: #555; }
+.sk-card.c-davy_jones .sk-special-name { color: #aaa; }
+.sk-card.c-plank       { background: linear-gradient(165deg, #2b1a08, #150d04); border-color: #c0884a; }
+.sk-card.c-plank .sk-special-name { color: #d4a574; }
+.sk-card.c-last_volley { background: linear-gradient(165deg, #2e1010, #160808); border-color: #e74c3c; }
+.sk-card.c-last_volley .sk-special-name { color: #f1948a; font-size: 8cqw; }
 
 /* Coins */
 .sk-corner {

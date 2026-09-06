@@ -26,7 +26,7 @@
       <div class="ext-toggle" :class="{ active: withExtensions }">
         <div class="ext-toggle-info">
           <span class="ext-label">EXTENSIONS</span>
-          <span class="ext-desc">{{ withExtensions ? '🐙 Kraken · 🐋 Baleine · 💰 Butin · 🃏 cartes d\'extension' : 'Jeu de base uniquement' }}</span>
+          <span class="ext-desc">{{ withExtensions ? '🐙 Kraken · 🐋 Baleine · 🦈 Raie · ⚰️ Davy Jones · 🗡️ Second · 💥 Salve · 🪵 Planche · 🃏 extra' : 'Jeu de base uniquement' }}</span>
         </div>
         <button class="ext-btn" :class="{ on: withExtensions }" :disabled="!amIHost"
                 @click="toggleExtensions" :title="amIHost ? '' : 'Seul le capitaine peut changer ce mode'">
@@ -147,8 +147,10 @@
           <div class="table-info">
             <span v-if="leadSuit" class="lead-suit">Couleur demandée : <strong>{{ suitLabel(leadSuit) }} {{ suitIcon(leadSuit) }}</strong></span>
             <span v-else class="lead-suit muted">Aucune couleur demandée</span>
-            <span class="turn-indicator" :class="{ mine: isMyTurn, resolving }">
+            <span class="turn-indicator" :class="{ mine: isMyTurn || (awaitingVolleyPlay && isMyTurn), resolving }">
               <template v-if="resolving">⏳ Résolution du pli...</template>
+              <template v-else-if="awaitingVolleyPlay && isMyTurn">💥 Dernière salve ! Joue ta 2ᵉ carte.</template>
+              <template v-else-if="awaitingVolleyPlay">💥 Dernière salve ! {{ currentTurnName }} doit jouer une 2ᵉ carte.</template>
               <template v-else>{{ isMyTurn ? '👉 À toi de jouer !' : `Au tour de ${currentTurnName || '...'}` }}</template>
               <span v-if="timerType === 'turn' && !resolving" class="turn-timer" :class="{ urgent: timerSecondsLeft <= 5, mine: isMyTurn }">
                 ⏱️ {{ timerSecondsLeft }}s
@@ -311,11 +313,19 @@
               <li>🏳️ <strong>Fuite / Butin</strong> perdent toujours</li>
               <li>🐯 <strong>Tigresse</strong> : pirate ou fuite au choix</li>
             </ul>
-            <h4 v-if="withExtensions">Extensions</h4>
+            <h4 v-if="withExtensions">Léviathans</h4>
             <ul v-if="withExtensions">
               <li>🐙 <strong>Kraken</strong> : détruit le pli, personne ne gagne</li>
               <li>🐋 <strong>Baleine blanche</strong> : détruit les spéciales, le plus haut chiffre gagne</li>
+              <li>🦈 <strong>Raie tachetée</strong> : le plus <em>bas</em> chiffre gagne (dernier léviathan joué l'emporte)</li>
+              <li>⚰️ <strong>Casier de Davy Jones</strong> : détruit tous les léviathans (+20 pts/léviathan au gagnant)</li>
+            </ul>
+            <h4 v-if="withExtensions">Nouvelles cartes</h4>
+            <ul v-if="withExtensions">
               <li>💰 <strong>Butin</strong> : alliance avec le gagnant (+20 chacun si les 2 misent juste)</li>
+              <li>🗡️ <strong>Second</strong> : bat tout sauf SK et Sirènes · SK/Sirène qui le capture : +30 pts</li>
+              <li>🪵 <strong>Supplice de la planche</strong> : retire un Pirate du pli avant résolution</li>
+              <li>💥 <strong>Dernière salve</strong> : tu dois jouer une 2ᵉ carte · ne participe pas au dernier pli</li>
             </ul>
             <h4 v-if="withExtensions">Cartes d'extension</h4>
             <ul v-if="withExtensions">
@@ -383,6 +393,7 @@ const showHelp = ref(false)
 const tigressCard = ref(null)
 const zeroFourteenCard = ref(null)
 const jokerCard = ref(null)
+const awaitingVolleyPlay = ref(false)
 
 // ── Minuteur ───────────────────────────────────
 const timerType = ref(null)   // 'bid' | 'turn' | null
@@ -404,7 +415,7 @@ const timerPct = computed(() => {
 const canStart = computed(() => allConnectedPlayers.value.length >= 3 && allConnectedPlayers.value.length <= 8)
 
 const SUIT_ORDER = { green: 0, yellow: 1, purple: 2, black: 3 }
-const TYPE_ORDER = { number: 0, joker15: 0.5, escape: 1, loot: 2, tigress: 3, mermaid: 4, pirate: 5, skullking: 6, kraken: 7, whale: 8 }
+const TYPE_ORDER = { number: 0, joker15: 0.5, escape: 1, loot: 2, plank: 2.5, last_volley: 2.6, tigress: 3, mermaid: 4, pirate: 5, second: 5.5, skullking: 6, kraken: 7, whale: 8, stingray: 8.5, davy_jones: 9 }
 
 const sortedHand = computed(() => {
   return [...myHand.value].sort((a, b) => {
@@ -529,6 +540,7 @@ onMounted(() => {
     currentTurnName.value = data.currentTurnName
     lastTrick.value = data.lastTrick
     resolving.value = !!data.resolving
+    awaitingVolleyPlay.value = !!data.awaitingVolleyPlay
     roundResults.value = data.roundResults
     history.value = data.history || []
     if (data.withExtensions !== undefined) withExtensions.value = data.withExtensions
