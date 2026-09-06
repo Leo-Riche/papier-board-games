@@ -69,7 +69,7 @@
           <h3>Format de partie</h3>
           <label class="opt-row">
             <select v-model="scoreMode" @change="pushOption('scoreMode', scoreMode)">
-              <option value="classic1000">Classique — 1000 pts</option>
+              <option value="classic1001">Classique — 1001 pts</option>
               <option value="short501">Courte — 501 pts</option>
               <option value="endless">Infinie (l'hôte arrête)</option>
               <option value="single">Manche unique</option>
@@ -79,12 +79,17 @@
             <input type="checkbox" v-model="valetMalus" @change="pushOption('valetMalus', valetMalus)" />
             <span>Malus valet tournant<br /><small>−100 si la main refuse de prendre un valet retourné</small></span>
           </label>
+          <label class="opt-check">
+            <input type="checkbox" v-model="liveScore" @change="pushOption('liveScore', liveScore)" />
+            <span>Points en temps réel<br /><small>affiche les points de la donne, mis à jour à chaque pli</small></span>
+          </label>
           <p class="opt-hint">La distribution (3-2 ou 2-3) est choisie par le donneur à chaque donne.</p>
         </div>
         <div class="lobby-panel" v-else>
           <h3>Format de partie</h3>
           <p class="opt-readonly">{{ modeLabel(scoreMode) }}</p>
           <p v-if="valetMalus" class="opt-readonly small">⚠️ Malus valet tournant (−100)</p>
+          <p v-if="liveScore" class="opt-readonly small">📊 Points en temps réel</p>
         </div>
       </div>
 
@@ -453,10 +458,11 @@ function cardStrength(card, trumpSuit, leadSuit) {
 const allConnectedPlayers = ref([])
 const amIHost = ref(false)
 const seatOrder = ref([null, null, null, null])
-const scoreMode = ref('classic1000')
+const scoreMode = ref('classic1001')
 const DEFAULT_SPLIT = '3-2' // le donneur peut changer à chaque donne dans le jeu
 const teamNames = ref({ A: '', B: '' }) // vide → "Nous" / "Eux" selon le point de vue
 const valetMalus = ref(false) // −100 si la main refuse un valet tournant
+const liveScore = ref(false) // affiche les points de la donne en cours, MAJ à chaque pli
 
 // ---- état partie ----
 const gameStatus = ref('waiting')
@@ -551,7 +557,7 @@ const handOverlap = computed(() => (myHand.value.length > 8 ? '-28px' : '-18px')
 const takerTeam = computed(() => (takerSeat.value == null ? null : (takerSeat.value % 2 === 0 ? 'A' : 'B')))
 const handMeterShown = computed(() =>
   gameStatus.value === 'hand_over' ||
-  (gameStatus.value === 'playing' && handPoints.value.A + handPoints.value.B > 0)
+  (gameStatus.value === 'playing' && liveScore.value && handPoints.value.A + handPoints.value.B > 0)
 )
 const handMeterTitle = computed(() => {
   const { A, B } = handPoints.value
@@ -666,7 +672,7 @@ const endReason = computed(() => {
   return `${teamLabel(w)} l'emporte ${endScores.value[w]}–${endScores.value[l]} !`
 })
 function modeLabel(m) {
-  return { classic1000: '1000 pts', short501: '501 pts', endless: 'Infinie', single: 'Manche unique' }[m] || m
+  return { classic1001: '1001 pts', short501: '501 pts', endless: 'Infinie', single: 'Manche unique' }[m] || m
 }
 
 // position écran d'un siège absolu : 0=bas(moi) 1=gauche 2=haut(partenaire) 3=droite
@@ -702,6 +708,7 @@ function startGame() {
       scoreMode: scoreMode.value,
       defaultSplit: DEFAULT_SPLIT,
       valetMalus: valetMalus.value,
+      liveScore: liveScore.value,
       teamNames: { A: teamNames.value.A.trim(), B: teamNames.value.B.trim() },
     },
   })
@@ -776,6 +783,7 @@ onMounted(() => {
     if (key === 'teamNameA') teamNames.value = { ...teamNames.value, A: value || '' }
     if (key === 'teamNameB') teamNames.value = { ...teamNames.value, B: value || '' }
     if (key === 'valetMalus') valetMalus.value = !!value
+    if (key === 'liveScore') liveScore.value = !!value
   })
 
   socket.on('game_started', () => { gameLogs.value = [] })
@@ -813,6 +821,7 @@ onMounted(() => {
     matchOver.value = !!d.matchOver
     if (d.scoreMode) scoreMode.value = d.scoreMode
     if (typeof d.valetMalus === 'boolean') valetMalus.value = d.valetMalus
+    if (typeof d.liveScore === 'boolean') liveScore.value = d.liveScore
     if (d.teamNames) teamNames.value = { A: d.teamNames.A || '', B: d.teamNames.B || '' }
   })
 

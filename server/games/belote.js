@@ -78,14 +78,17 @@ class Belote {
     this.players = playersData.map((p, i) => ({ id: p.id, name: p.name, seat: i }));
     this.hostName = options.hostName || playersData[0].name;
 
-    this.scoreMode = ['classic1000', 'short501', 'endless', 'single'].includes(options.scoreMode)
-      ? options.scoreMode : 'classic1000';
-    this.targetScore = this.scoreMode === 'classic1000' ? 1000
+    this.scoreMode = ['classic1001', 'short501', 'endless', 'single'].includes(options.scoreMode)
+      ? options.scoreMode : 'classic1001';
+    this.targetScore = this.scoreMode === 'classic1001' ? 1001
       : this.scoreMode === 'short501' ? 501 : null;
     this.defaultSplit = options.defaultSplit === '2-3' ? '2-3' : '3-2';
     // Malus "valet tournant" : si la main (1er à parler) refuse un valet retourné,
     // son équipe perd 100 points sur le total, immédiatement.
     this.valetMalus = !!options.valetMalus;
+    // Affiche les points de la donne en cours, mis à jour à chaque pli.
+    // Off par défaut : sinon le serveur ne transmet pas handPoints pendant le jeu.
+    this.liveScore = !!options.liveScore;
     // Sièges en train de "revoir le dernier pli" -> personne ne peut jouer pendant ce temps.
     this._reviewers = new Map(); // seat -> timeout de sécurité
 
@@ -537,9 +540,9 @@ class Belote {
     if (partnerMaster) return hand.slice();          // partenaire maître -> libre
     if (myTrumps.length === 0) return hand.slice();  // pas d'atout -> défausse libre
     if (trumpsInTrick.length > 0) {
-      // un adversaire a déjà coupé -> surcouper si possible, sinon libre
+      // un adversaire a déjà coupé -> surcouper si possible, sinon sous-couper obligatoire
       const higher = myTrumps.filter((c) => TRUMP_RANK[c.value] > highestTrump);
-      return higher.length ? higher : hand.slice();
+      return higher.length ? higher : myTrumps;
     }
     // personne n'a coupé et l'adversaire est maître -> couper obligatoire
     return myTrumps;
@@ -583,6 +586,7 @@ class Belote {
         deckSize: (this.matchDeck && this.matchDeck.length) || 32,
         teamNames: this.teamNames,
         valetMalus: this.valetMalus,
+        liveScore: this.liveScore,
         split: s.split,
         trump: s.trump || null,
         takerSeat: s.takerSeat,
@@ -594,7 +598,7 @@ class Belote {
         myLegalCards: myLegal,
         currentTrick: s.currentTrick.map((t) => ({ seat: t.seat, name: this.nameOf(t.seat), card: t.card })),
         leadSuit: s.leadSuit,
-        handPoints: s.handPoints,
+        handPoints: (this.liveScore || s.status !== 'playing') ? s.handPoints : { A: 0, B: 0 },
         lastTrick: (s.status === 'playing' && !s.currentTrick.length) ? (s.lastTrick || null) : null,
         reviewers: this._reviewerNames(),
         history: this.history,
