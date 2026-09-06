@@ -1,5 +1,5 @@
 <template>
-  <div class="sk-wrapper">
+  <div class="sk-wrapper" :class="{ 'my-turn': isMyTurn && phase === 'playing' && gameStatus !== 'waiting' }">
 
     <!-- ============ WAITING SCREEN ============ -->
     <div v-if="gameStatus === 'waiting'" class="waiting-screen">
@@ -73,6 +73,13 @@
         <!-- LEFT : colonne des joueurs -->
         <aside class="players-column">
           <div class="players-col-title">JOUEURS</div>
+
+          <!-- Total des mises -->
+          <div v-if="phase !== 'bidding'" class="bids-total" :class="bidsTotalClass">
+            <span class="bids-total-label">Plis misés</span>
+            <span class="bids-total-val">{{ totalBids }}<span class="bids-total-sep">/</span>{{ cardsThisRound }}</span>
+            <span class="bids-total-hint">{{ bidsTotalHint }}</span>
+          </div>
           <div v-for="p in players" :key="p.id" class="player-box"
                :class="{ me: p.name === myName, turn: p.isCurrentTurn, leader: phase === 'bidding' && p.isLeader }">
             <span v-if="p.isCurrentTurn" class="pb-turn-tag">à son tour</span>
@@ -192,8 +199,8 @@
         </div>
 
         <!-- MY HAND -->
-        <div class="my-hand-zone">
-          <div class="zone-label">
+        <div class="my-hand-zone" :class="{ 'my-turn-zone': isMyTurn }">
+          <div class="zone-label" :class="{ 'my-turn-label': isMyTurn }">
             TES CARTES
             <span class="my-bid-badge">Mise : <strong>{{ myBid }}</strong> · Plis gagnés : <strong>{{ myTricksWon }}</strong></span>
           </div>
@@ -435,6 +442,22 @@ const sortedHand = computed(() => {
 
 const finalRanking = computed(() => [...players.value].sort((a, b) => b.score - a.score))
 
+const totalBids = computed(() =>
+  players.value.reduce((sum, p) => sum + (p.bid ?? 0), 0)
+)
+const bidsTotalClass = computed(() => {
+  const diff = totalBids.value - cardsThisRound.value
+  if (diff > 0) return 'bids-over'
+  if (diff < 0) return 'bids-under'
+  return 'bids-even'
+})
+const bidsTotalHint = computed(() => {
+  const diff = totalBids.value - cardsThisRound.value
+  if (diff > 0) return `+${diff} en trop`
+  if (diff < 0) return `${diff} en moins`
+  return 'équilibré'
+})
+
 // ── Helpers ────────────────────────────────────
 const SUIT_ICONS = { green: '🦜', yellow: '🪙', purple: '💎', black: '🏴‍☠️' }
 const SUIT_LABELS = { green: 'Perroquet', yellow: 'Coffre', purple: 'Trésor', black: 'Drapeau pirate' }
@@ -578,6 +601,28 @@ onUnmounted(() => {
   font-family: 'Outfit', sans-serif;
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: box-shadow 0.4s ease;
+}
+
+/* Surbrillance quand c'est notre tour */
+.sk-wrapper.my-turn {
+  box-shadow:
+    inset 0 0 0 3px rgba(46, 204, 113, 0.55),
+    inset 0 0 40px rgba(46, 204, 113, 0.07);
+  animation: turnGlow 1.8s ease-in-out infinite;
+}
+@keyframes turnGlow {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 3px rgba(46, 204, 113, 0.35),
+      inset 0 0 30px rgba(46, 204, 113, 0.05);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 4px rgba(46, 204, 113, 0.75),
+      inset 0 0 55px rgba(46, 204, 113, 0.13);
+  }
 }
 
 /* ── WAITING ─────────────────────────────────── */
@@ -667,6 +712,26 @@ onUnmounted(() => {
   padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
 }
 .players-col-title { font-size: 0.7rem; font-weight: 900; letter-spacing: 3px; color: #f1c40f; text-transform: uppercase; padding: 0 4px 4px; }
+
+/* Total des mises */
+.bids-total {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 12px 10px; border-radius: 12px; border: 1px solid;
+  text-align: center; flex-shrink: 0;
+}
+.bids-total.bids-even  { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+.bids-total.bids-over  { background: rgba(241,196,15,0.08); border-color: rgba(241,196,15,0.35); }
+.bids-total.bids-under { background: rgba(93,173,226,0.08); border-color: rgba(93,173,226,0.35); }
+.bids-total-label { font-size: 0.62rem; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #5d7a92; }
+.bids-total-val { font-size: 1.8rem; font-weight: 900; line-height: 1; }
+.bids-total.bids-even  .bids-total-val { color: #bdc3c7; }
+.bids-total.bids-over  .bids-total-val { color: #f1c40f; }
+.bids-total.bids-under .bids-total-val { color: #5dade2; }
+.bids-total-sep { font-size: 1.2rem; font-weight: 400; color: #5d7a92; margin: 0 2px; }
+.bids-total-hint { font-size: 0.72rem; font-weight: 700; }
+.bids-total.bids-even  .bids-total-hint { color: #5d7a92; }
+.bids-total.bids-over  .bids-total-hint { color: #f1c40f; }
+.bids-total.bids-under .bids-total-hint { color: #5dade2; }
 .main-column { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow-y: auto; }
 
 .player-box {
@@ -694,7 +759,18 @@ onUnmounted(() => {
 .bid-wait { color: #5d7a92; }
 
 /* Zone labels */
-.zone-label { font-size: 0.68rem; font-weight: 900; letter-spacing: 3px; color: #5d7a92; text-transform: uppercase; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.zone-label { font-size: 0.68rem; font-weight: 900; letter-spacing: 3px; color: #5d7a92; text-transform: uppercase; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; transition: color 0.3s, text-shadow 0.3s; }
+
+/* Surbrillance "TES CARTES" quand c'est mon tour */
+.zone-label.my-turn-label {
+  color: #2ecc71;
+  text-shadow: 0 0 10px rgba(46, 204, 113, 0.7), 0 0 20px rgba(46, 204, 113, 0.4);
+  animation: labelGlow 1.6s ease-in-out infinite;
+}
+@keyframes labelGlow {
+  0%, 100% { text-shadow: 0 0 8px rgba(46, 204, 113, 0.5), 0 0 18px rgba(46, 204, 113, 0.3); }
+  50%       { text-shadow: 0 0 16px rgba(46, 204, 113, 0.9), 0 0 30px rgba(46, 204, 113, 0.6); }
+}
 
 /* ── BIDDING ─────────────────────────────────── */
 .bidding-zone { flex: 1; display: flex; flex-direction: column; gap: 24px; padding: 24px 20px; align-items: center; }
@@ -799,7 +875,16 @@ onUnmounted(() => {
 .last-trick-banner strong { color: #f1c40f; }
 .bonus-recap { color: #2ecc71; font-size: 0.85rem; }
 
-.my-hand-zone { padding: 34px 20px 28px; }
+.my-hand-zone { padding: 34px 20px 28px; transition: background 0.4s ease, box-shadow 0.4s ease; }
+.my-hand-zone.my-turn-zone {
+  background: rgba(46, 204, 113, 0.07);
+  box-shadow: inset 0 2px 0 rgba(46, 204, 113, 0.45);
+  animation: handZoneGlow 1.6s ease-in-out infinite;
+}
+@keyframes handZoneGlow {
+  0%, 100% { background: rgba(46, 204, 113, 0.05); box-shadow: inset 0 2px 0 rgba(46, 204, 113, 0.35); }
+  50%       { background: rgba(46, 204, 113, 0.11); box-shadow: inset 0 2px 0 rgba(46, 204, 113, 0.65); }
+}
 .my-bid-badge { color: #bdc3c7; font-weight: 600; font-size: 0.8rem; }
 .my-bid-badge strong { color: #f1c40f; }
 .hand-cards { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
@@ -883,6 +968,10 @@ onUnmounted(() => {
   .player-box { min-width: 150px; flex-shrink: 0; padding: 12px 14px; }
   .pb-turn-tag { display: none; }
   .pb-score { font-size: 1.4rem; }
+  .bids-total { flex-direction: row; gap: 8px; padding: 8px 14px; min-width: 130px; }
+  .bids-total-label { font-size: 0.58rem; }
+  .bids-total-val { font-size: 1.3rem; }
+  .bids-total-hint { font-size: 0.65rem; }
 }
 
 @media (max-width: 600px) {

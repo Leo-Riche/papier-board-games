@@ -21,30 +21,40 @@
       </div>
 
       <div class="game-card" @click="$router.push('/yams/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Yams 🎲</h2>
         <p>Lancez les dés, composez vos combinaisons et visez le Yams pour la victoire !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
       <div class="game-card" @click="$router.push('/thegang/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>The Gang 🔫</h2>
         <p>Coopératif & silencieux : classez vos mains de poker sans parler et réussissez 3 braquages !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
       
       <div class="game-card" @click="$router.push('/charger/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Chargeeer 🛡️</h2>
         <p>Piochez, chargez, attaquez ! Bouclier, alliances et stratégie décideront du dernier survivant !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
 
       <div class="game-card" @click="$router.push('/skullking/lobby')">
-        <div class="badge">Nouveau !</div>
         <h2>Skull King 💀👑</h2>
         <p>Misez le nombre exact de plis que vous remporterez et devenez le Capitaine des Sept Mers !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
+
+      <div class="game-card" @click="$router.push('/traitre/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Traître à bord 🏴‍☠️</h2>
+        <p>Des Mutins se cachent parmi l'équipage. Remplissez le Coffre... ou sabotez la collecte et semez la mutinerie !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
+
+      <div class="game-card" @click="$router.push('/belote/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Belote ♥</h2>
+        <p>Le grand classique en 2 contre 2 : prenez l'atout, coupez, faites tomber le contrat. À 4 joueurs.</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
     </div>
