@@ -12,6 +12,7 @@ const Charger = require('./games/charger');
 const SkullKing = require('./games/skullking');
 const Traitre = require('./games/traitre');
 const Belote = require('./games/belote');
+const Tarot = require('./games/tarot');
 
 const app = express();
 
@@ -473,6 +474,66 @@ io.on('connection', (socket) => {
     const cleanRoomCode = roomCode.trim();
     const game = activeGames[cleanRoomCode];
     if (game && game instanceof Belote) {
+      game.handleAction(socket.id, actionType, payload || {});
+    }
+  });
+
+  // ── TAROT ──────────────────────────────────────────────────
+  socket.on('tarot_sync_option', ({ roomCode, key, value }) => {
+    io.to(roomCode.trim()).emit('tarot_option_updated', { key, value });
+  });
+
+  socket.on('tarot_set_seating', ({ roomCode, seatOrder }) => {
+    io.to(roomCode.trim()).emit('tarot_seating', seatOrder);
+  });
+
+  socket.on('start_tarot', (payload) => {
+    const roomCode = typeof payload === 'string' ? payload : (payload && payload.roomCode);
+    const options  = (typeof payload === 'object' && payload) ? (payload.options || {}) : {};
+    const seatOrder = (typeof payload === 'object' && payload && Array.isArray(payload.seatOrder))
+      ? payload.seatOrder : null;
+
+    if (!roomCode || typeof roomCode !== 'string') {
+      return console.log(`🚫 start_tarot: roomCode invalide`);
+    }
+    const cleanRoomCode = roomCode.trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    const prevGame = activeGames[cleanRoomCode];
+    const isHostByName = prevGame instanceof Tarot && prevGame.hostName
+      && socket.playerName === prevGame.hostName;
+    if (clients[0] !== socket.id && !isHostByName) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+    if (clients.length < 3 || clients.length > 5) {
+      return socket.emit('tarot_error', `Le Tarot se joue de 3 à 5 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    let ordered = clients;
+    if (seatOrder && seatOrder.length === clients.length &&
+        seatOrder.every((id) => clients.includes(id)) &&
+        new Set(seatOrder).size === clients.length) {
+      ordered = seatOrder;
+    }
+
+    const playersData = ordered.map((id) => ({
+      id,
+      name: io.sockets.sockets.get(id)?.playerName || 'Anonyme',
+    }));
+    options.hostName = isHostByName
+      ? socket.playerName
+      : (io.sockets.sockets.get(clients[0])?.playerName || playersData[0].name);
+
+    const game = new Tarot(cleanRoomCode, playersData, io, options);
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('tarot_action', (data) => {
+    const { roomCode, actionType, payload } = data;
+    const cleanRoomCode = roomCode.trim();
+    const game = activeGames[cleanRoomCode];
+    if (game && game instanceof Tarot) {
       game.handleAction(socket.id, actionType, payload || {});
     }
   });

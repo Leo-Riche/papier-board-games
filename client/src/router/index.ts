@@ -39,6 +39,10 @@ import BeloteLobby from '../views/Belote/BeloteLobby.vue'
 import BeloteBoard from '../views/Belote/BeloteBoard.vue'
 import BeloteJoin from '../views/Belote/BeloteJoin.vue'
 
+import TarotLobby from '../views/Tarot/TarotLobby.vue'
+import TarotBoard from '../views/Tarot/TarotBoard.vue'
+import TarotJoin from '../views/Tarot/TarotJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -192,6 +196,23 @@ const routes = [
     path: '/belote/join/:id',
     name: 'BeloteJoin',
     component: BeloteJoin,
+    props: true
+  },
+  {
+    path: '/tarot/lobby',
+    name: 'TarotLobby',
+    component: TarotLobby
+  },
+  {
+    path: '/tarot/:id',
+    name: 'TarotBoard',
+    component: TarotBoard,
+    props: true
+  },
+  {
+    path: '/tarot/join/:id',
+    name: 'TarotJoin',
+    component: TarotJoin,
     props: true
   },
 ]
