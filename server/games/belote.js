@@ -279,6 +279,7 @@ class Belote {
       }
       s.trump = trump;
       s.takerSeat = seat;
+      const takenCard = s.retourne;
 
       // Distribution du reste : preneur = retourne + 2, autres = 3
       s.hands[seat].push(s.retourne);
@@ -304,6 +305,9 @@ class Belote {
       s.leadSuit = null;
       s.trickCount = 0;
       this.log(`🎯 ${this.nameOf(seat)} prend à ${SUIT_SYM[trump]}. ${this.nameOf(s.turnSeat)} entame.`);
+      this.io.to(this.roomCode).emit('belote_taken', {
+        seat, name: this.nameOf(seat), team: teamOf(seat), trump, card: takenCard,
+      });
       this.broadcastState();
       return;
     }
@@ -311,7 +315,7 @@ class Belote {
     if (type === 'review') {
       if (s.status !== 'playing') return;
       const had = this._reviewers.has(seat);
-      const canOpen = payload.open && s.lastTrick && s.currentTrick.length === 0;
+      const canOpen = payload.open && s.lastTrick && s.currentTrick.length < 4;
       const old = this._reviewers.get(seat);
       if (old) clearTimeout(old);
       this._reviewers.delete(seat);
@@ -599,7 +603,7 @@ class Belote {
         currentTrick: s.currentTrick.map((t) => ({ seat: t.seat, name: this.nameOf(t.seat), card: t.card })),
         leadSuit: s.leadSuit,
         handPoints: (this.liveScore || s.status !== 'playing') ? s.handPoints : { A: 0, B: 0 },
-        lastTrick: (s.status === 'playing' && !s.currentTrick.length) ? (s.lastTrick || null) : null,
+        lastTrick: (s.status === 'playing' && s.currentTrick.length < 4) ? (s.lastTrick || null) : null,
         reviewers: this._reviewerNames(),
         history: this.history,
         beloteSeat: s.beloteProgress > 0 ? s.beloteSeat : null,
