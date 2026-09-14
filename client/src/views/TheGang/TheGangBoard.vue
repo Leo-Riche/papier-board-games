@@ -19,7 +19,7 @@
       </ul>
 
       <div class="player-count-info" :class="{ ok: allConnectedPlayers.length >= 3, warn: allConnectedPlayers.length < 3 }">
-        {{ allConnectedPlayers.length }}/6 joueurs
+        {{ allConnectedPlayers.length }}/9 joueurs
         <span v-if="allConnectedPlayers.length < 3"> — encore {{ 3 - allConnectedPlayers.length }} requis</span>
       </div>
 
@@ -41,7 +41,7 @@
       </div>
 
       <button v-if="amIHost" class="btn-primary"
-        :disabled="allConnectedPlayers.length < 3 || allConnectedPlayers.length > 6"
+        :disabled="allConnectedPlayers.length < 3 || allConnectedPlayers.length > 9"
         @click="startGame">
         LANCER LE BRAQUAGE 🔫
       </button>
@@ -350,7 +350,7 @@
               <span class="panel-subtitle">1 = plus faible · {{ totalTokens }} = plus fort</span>
             </div>
 
-            <div class="tokens-grid">
+            <div class="tokens-grid" :class="{ compact: totalTokens > 6 }">
               <div
                 v-for="n in totalTokens"
                 :key="n"
@@ -359,7 +359,7 @@
                 @click="handleTokenClick(n)"
                 :title="getTokenTitle(n)"
               >
-                <TokenChip :count="n" :size="72" :phase="phase" />
+                <TokenChip :count="n" :size="tokenChipSize" :phase="phase" />
                 <div class="token-owner-label">{{ getTokenOwnerLabel(n) }}</div>
               </div>
             </div>
@@ -553,6 +553,9 @@ const tokenHistory = ref([])
 const showHandsModal = ref(false)
 const currentHeistLog = ref([])
 const oneShotMode = ref(false)
+
+// Shrink the chips when the table is large so the token grid stays compact
+const tokenChipSize = computed(() => (totalTokens.value > 6 ? 56 : 72))
 
 // ── Hand rankings reference ────────────────────
 const HAND_RANKINGS = [
@@ -1447,6 +1450,11 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.tokens-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+  gap: 6px;
 }
 
 .token-wrap {

@@ -72,7 +72,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  count: {         // token number (1–6)
+  count: {         // token number (1–9)
     type: Number,
     required: true
   },
@@ -127,7 +127,7 @@ const colors = computed(() => PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['pre
 
 // ── Star size scales with fewer stars ─────────────────────
 const starSize = computed(() => {
-  const sizes = { 1: 9.5, 2: 8.5, 3: 7.5, 4: 6.5, 5: 5.8, 6: 5.2 }
+  const sizes = { 1: 9.5, 2: 8.5, 3: 7.5, 4: 6.5, 5: 5.8, 6: 5.2, 7: 4.8, 8: 4.5, 9: 4.2 }
   return sizes[props.count] ?? 6
 })
 
@@ -165,10 +165,40 @@ const STAR_POSITIONS = {
     { x: 62, y: 50 },
     { x: 38, y: 63 },
     { x: 62, y: 63 }
+  ],
+  7: [
+    { x: 38, y: 36 },
+    { x: 62, y: 36 },
+    { x: 38, y: 50 },
+    { x: 50, y: 50 },
+    { x: 62, y: 50 },
+    { x: 38, y: 64 },
+    { x: 62, y: 64 }
+  ],
+  8: [
+    { x: 35, y: 36 },
+    { x: 50, y: 36 },
+    { x: 65, y: 36 },
+    { x: 40, y: 50 },
+    { x: 60, y: 50 },
+    { x: 35, y: 64 },
+    { x: 50, y: 64 },
+    { x: 65, y: 64 }
+  ],
+  9: [
+    { x: 35, y: 36 },
+    { x: 50, y: 36 },
+    { x: 65, y: 36 },
+    { x: 35, y: 50 },
+    { x: 50, y: 50 },
+    { x: 65, y: 50 },
+    { x: 35, y: 64 },
+    { x: 50, y: 64 },
+    { x: 65, y: 64 }
   ]
 }
 
-const starPositions = computed(() => STAR_POSITIONS[Math.max(1, Math.min(6, props.count))] ?? STAR_POSITIONS[1])
+const starPositions = computed(() => STAR_POSITIONS[Math.max(1, Math.min(9, props.count))] ?? STAR_POSITIONS[1])
 
 // ── 5-pointed star path generator ─────────────────────────
 const starPath = (cx, cy, r) => {

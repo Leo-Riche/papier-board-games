@@ -15,7 +15,7 @@
 
       <!-- Players list -->
       <div class="players-panel">
-        <p class="panel-label">JOUEURS ({{ players.length }}/6)</p>
+        <p class="panel-label">JOUEURS ({{ players.length }}/9)</p>
         <div class="players-list">
           <div v-for="(player, i) in players" :key="player.id"
                class="player-row" :class="{ 'is-me': player.id === socketId }">
@@ -30,11 +30,11 @@
         <div class="count-warning" v-if="players.length < 3">
           <span>⚠️ Minimum 3 joueurs requis ({{ 3 - players.length }} manquant{{ 3 - players.length > 1 ? 's' : '' }})</span>
         </div>
-        <div class="count-ok" v-else-if="players.length <= 6">
+        <div class="count-ok" v-else-if="players.length <= 9">
           <span>✓ Prêt à jouer !</span>
         </div>
         <div class="count-warning" v-else>
-          <span>⚠️ Maximum 6 joueurs atteint</span>
+          <span>⚠️ Maximum 9 joueurs atteint</span>
         </div>
       </div>
 
@@ -56,7 +56,7 @@
         <div v-if="amIHost">
           <BaseButton
             variant="primary"
-            :disabled="players.length < 3 || players.length > 6"
+            :disabled="players.length < 3 || players.length > 9"
             @click="$emit('start')"
           >
             🔫 Lancer le braquage ({{ players.length }} joueurs)

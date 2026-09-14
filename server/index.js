@@ -382,8 +382,8 @@ io.on('connection', (socket) => {
       return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
     }
 
-    if (clients.length < 3 || clients.length > 6) {
-      return socket.emit('thegang_error', `The Gang nécessite entre 3 et 6 joueurs (actuellement : ${clients.length}).`);
+    if (clients.length < 3 || clients.length > 9) {
+      return socket.emit('thegang_error', `The Gang nécessite entre 3 et 9 joueurs (actuellement : ${clients.length}).`);
     }
 
     const playersData = clients.map(id => {
