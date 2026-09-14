@@ -9,6 +9,14 @@
       <div class="belote-flash-who">{{ beloteFlash.playerName }}<span v-if="beloteFlash.word === 'Rebelote'"> · +20 pts</span></div>
     </div>
 
+    <!-- Animation "prise" : qui prend, à quelle couleur, avec quelle carte -->
+    <div v-if="takenFlash" class="taken-flash" :class="suitColorName(takenFlash.trump)">
+      <div class="tk-halo" :class="suitColorName(takenFlash.trump)">{{ suitSym(takenFlash.trump) }}</div>
+      <div class="tk-title">{{ takenFlash.name }} prend&#8202;!</div>
+      <div class="tk-suit" :class="suitColorName(takenFlash.trump)">à {{ suitSym(takenFlash.trump) }} {{ suitLabel(takenFlash.trump) }}</div>
+      <BeloteCard :card="takenFlash.card" class="tk-card" />
+    </div>
+
     <!-- Animation "valet tournant refusé" (malus) -->
     <div v-if="shameFlash" class="shame-flash">
       <div class="sf-emoji">😳</div>
@@ -113,12 +121,13 @@
           <span v-if="trump" class="tb-trump" :class="suitColorName(trump)">Atout {{ suitSym(trump) }}</span>
         </div>
         <div class="tb-scores">
-          <span class="sc" :class="{ mine: myTeam === 'A' }">{{ teamLabel('A') }} : <b>{{ scores.A }}</b></span>
-          <span class="sc" :class="{ mine: myTeam === 'B' }">{{ teamLabel('B') }} : <b>{{ scores.B }}</b></span>
+          <span class="sc a" :class="{ mine: myTeam === 'A' }">{{ teamLabel('A') }} : <b>{{ scores.A }}</b></span>
+          <span class="sc b" :class="{ mine: myTeam === 'B' }">{{ teamLabel('B') }} : <b>{{ scores.B }}</b></span>
           <span v-if="targetScore" class="sc-target">/ {{ targetScore }}</span>
         </div>
         <div class="tb-right">
-          <span v-if="takerName" class="tb-taker">Preneur : {{ takerName }}</span>
+          <span class="tb-dealer" title="Donneur"><span class="dealer-chip">D</span> {{ nameOfSeat(dealerSeat) }}</span>
+          <span v-if="takerName" class="tb-taker" title="Preneur">👑 {{ takerName }}<span v-if="trump" class="tb-taker-suit" :class="suitColorName(trump)"> {{ suitSym(trump) }}</span></span>
           <button
             v-if="amIHost && gameStatus !== 'hand_over'"
             class="tb-stop"
@@ -140,7 +149,8 @@
             <div class="seat-head">
               <span class="seat-dot" :class="'team-' + seatAtPos(pos).team.toLowerCase()"></span>
               <span class="seat-nom">{{ seatAtPos(pos).name }}</span>
-              <span v-if="seatAtPos(pos).isTaker" class="taker-badge" :class="suitColorName(trump)" title="Preneur">👑&#8202;{{ suitSym(trump) }}</span>
+              <span v-if="seatAtPos(pos).isTaker" class="taker-badge" :class="suitColorName(trump)" title="Preneur">👑&#8202;<span class="taker-badge-suit">{{ suitSym(trump) }}</span></span>
+              <span v-if="seatAtPos(pos).isDealer" class="dealer-chip" title="Donneur">D</span>
             </div>
             <div class="seat-sub">
               {{ seatAtPos(pos).tricksWon }} pli{{ seatAtPos(pos).tricksWon > 1 ? 's' : '' }}<span class="sub-count"> · {{ seatAtPos(pos).handCount }} carte{{ seatAtPos(pos).handCount > 1 ? 's' : '' }}</span>
@@ -262,7 +272,8 @@
         <div class="my-head">
           <span class="seat-dot" :class="'team-' + (myTeam || 'a').toLowerCase()"></span>
           <strong>{{ myName }}</strong>
-          <span v-if="me?.isTaker" class="taker-badge" :class="suitColorName(trump)" title="Preneur">👑&#8202;{{ suitSym(trump) }}</span>
+          <span v-if="me?.isTaker" class="taker-badge" :class="suitColorName(trump)" title="Preneur">👑&#8202;<span class="taker-badge-suit">{{ suitSym(trump) }}</span></span>
+          <span v-if="me?.isDealer" class="dealer-chip" title="Donneur">D</span>
           <span v-if="beloteSeat === mySeat" class="belote-badge inline">♥ {{ beloteTeam ? 'Belote-Rebelote' : 'Belote' }}</span>
           <span class="my-tricks">· {{ me?.tricksWon || 0 }} pli(s)</span>
         </div>
@@ -308,8 +319,8 @@
             <thead>
               <tr>
                 <th>Donne</th>
-                <th :class="{ mine: myTeam === 'A' }">{{ teamLabel('A') }}</th>
-                <th :class="{ mine: myTeam === 'B' }">{{ teamLabel('B') }}</th>
+                <th class="a" :class="{ mine: myTeam === 'A' }">{{ teamLabel('A') }}</th>
+                <th class="b" :class="{ mine: myTeam === 'B' }">{{ teamLabel('B') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -441,7 +452,9 @@ const socket = io(socketUrl)
 const roomCode = route.params.id
 
 const SUIT_SYM = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
+const SUIT_NAME = { spades: 'Pique', hearts: 'Cœur', diamonds: 'Carreau', clubs: 'Trèfle' }
 const suitSym = (s) => SUIT_SYM[s] || ''
+const suitLabel = (s) => SUIT_NAME[s] || ''
 const suitColorName = (s) => (s === 'hearts' || s === 'diamonds' ? 'red' : 'black')
 const cid = (c) => `${c.suit}_${c.value}`
 
@@ -503,6 +516,8 @@ const beloteFlash = ref(null)
 let beloteFlashTimer = null
 const shameFlash = ref(null) // "valet tournant refusé"
 let shameFlashTimer = null
+const takenFlash = ref(null) // qui prend, à quelle couleur, avec quelle carte
+let takenFlashTimer = null
 
 // ---- animation : distribution des cartes + dévoilement de la retourne ----
 const dealing = ref(false)          // cartes en cours de distribution (stagger CSS)
@@ -619,7 +634,7 @@ const trickWinnerSeat = computed(() => {
 })
 
 const canReviewTrick = computed(() =>
-  gameStatus.value === 'playing' && !currentTrick.value.length && !!lastTrick.value
+  gameStatus.value === 'playing' && currentTrick.value.length < 4 && !!lastTrick.value
 )
 const reviewLocked = computed(() => reviewers.value.length > 0)
 
@@ -811,7 +826,7 @@ onMounted(() => {
     currentTrick.value = d.currentTrick || []
     lastTrick.value = d.lastTrick || null
     reviewers.value = d.reviewers || []
-    if (currentTrick.value.length || !lastTrick.value) showLastTrick.value = false
+    if (!canReviewTrick.value) showLastTrick.value = false
     handPoints.value = d.handPoints || { A: 0, B: 0 }
     seats.value = d.seats || []
     beloteSeat.value = d.beloteSeat ?? null
@@ -843,6 +858,12 @@ onMounted(() => {
     shameFlashTimer = setTimeout(() => { shameFlash.value = null }, 5000)
   })
 
+  socket.on('belote_taken', ({ name, trump: tk, card }) => {
+    takenFlash.value = { name, trump: tk, card }
+    clearTimeout(takenFlashTimer)
+    takenFlashTimer = setTimeout(() => { takenFlash.value = null }, 2800)
+  })
+
   socket.on('game_over', (d) => {
     gameStatus.value = 'finished'
     endWinner.value = d.winner
@@ -857,6 +878,7 @@ onUnmounted(() => {
   clearTimeout(toastTimer)
   clearTimeout(beloteFlashTimer)
   clearTimeout(shameFlashTimer)
+  clearTimeout(takenFlashTimer)
   clearDealTimers()
   if (showLastTrick.value) act('review', { open: false })
   socket.disconnect()
@@ -888,6 +910,32 @@ onUnmounted(() => {
 @media (prefers-reduced-motion: reduce) {
   .belote-flash, .belote-flash-word, .belote-flash-who, .bf-halo { animation: none !important; opacity: 1 !important; }
   .bf-halo { opacity: 0.12 !important; }
+}
+
+/* "prise" — qui prend, à quelle couleur, avec quelle carte */
+.taken-flash {
+  position: fixed; inset: 0; z-index: 255; pointer-events: none; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: rgba(6,20,14,0.72); animation: bfFade 2.8s ease forwards;
+}
+.tk-halo { position: absolute; font-size: 46vmin; line-height: 1; opacity: 0.14; animation: bfHalo 2.8s ease-out forwards; }
+.tk-halo.red { color: #ff4d5a; } .tk-halo.black { color: #dfe9ff; }
+.tk-title {
+  position: relative; font-size: clamp(1.8rem, 7vw, 3.1rem); font-weight: 900; color: #ffe08a;
+  text-shadow: 0 6px 28px rgba(0,0,0,0.7); animation: bfPop 0.5s cubic-bezier(0.2,1.5,0.35,1);
+}
+.tk-suit {
+  position: relative; font-size: clamp(1.1rem, 4vw, 1.6rem); font-weight: 800;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.6); animation: bfPop 0.5s 0.08s cubic-bezier(0.2,1.5,0.35,1) backwards;
+}
+.tk-suit.red { color: #ff6b6b; } .tk-suit.black { color: #eafff3; }
+.tk-card {
+  position: relative; width: 96px; height: 140px; margin-top: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.55);
+  animation: bfPop 0.5s 0.16s cubic-bezier(0.2,1.5,0.35,1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .taken-flash, .tk-halo, .tk-title, .tk-suit, .tk-card { animation: none !important; opacity: 1 !important; }
+  .tk-halo { opacity: 0.12 !important; }
 }
 
 /* "valet tournant refusé" — la honte (malus −100) */
@@ -925,10 +973,28 @@ onUnmounted(() => {
 /* Badge persistant "belote" sur le joueur concerné */
 .belote-badge { margin-top: 4px; background: rgba(255,224,138,0.16); border: 1px solid rgba(255,224,138,0.5); color: #ffe08a; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .belote-badge.inline { margin-top: 0; }
-/* preneur : 👑 + couleur d'atout, aligné avec le pseudo */
-.taker-badge { display: inline-flex; align-items: center; gap: 1px; font-size: 0.95em; line-height: 1; font-weight: 900; }
-.taker-badge.red { color: #ff6b6b; }
-.taker-badge.black { color: #eafff3; }
+/* preneur : 👑 + couleur d'atout, aligné avec le pseudo — pastille pleine pour bien ressortir */
+.taker-badge {
+  display: inline-flex; align-items: center; gap: 3px; font-size: 0.92em; line-height: 1; font-weight: 900;
+  padding: 3px 9px; border-radius: 999px; background: linear-gradient(135deg, #ffe8ab, #ffb84f);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+}
+.taker-badge-suit { font-size: 1.35em; }
+.taker-badge.red { color: #a3121f; }
+.taker-badge.black { color: #14251c; }
+
+/* donneur : jeton "D" façon bouton de donneur au poker — reconnaissable au premier coup d'œil */
+.dealer-chip {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 18px; height: 18px; border-radius: 50%; line-height: 1;
+  font-size: 0.66rem; font-weight: 900; color: #3a2c12;
+  background: radial-gradient(circle at 32% 28%, #fff, #e6dbbd 65%, #c9b57f);
+  border: 1px solid #8a7541; box-shadow: 0 1px 3px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.7);
+}
+.tb-dealer {
+  font-size: 0.85rem; font-weight: 700; color: #eee0bd; display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px 3px 3px; border-radius: 999px; background: rgba(201,181,127,0.12); border: 1px solid rgba(201,181,127,0.4);
+}
 
 /* ===== salle d'attente ===== */
 .waiting-screen { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 30px 16px; }
@@ -979,9 +1045,15 @@ onUnmounted(() => {
 .tb-trump { font-weight: 900; padding: 2px 10px; border-radius: 999px; background: #0a1f16; border: 1px solid #2f5a44; }
 .tb-trump.red { color: #ff6b6b; } .tb-trump.black { color: #cfe3ff; }
 .tb-scores { display: flex; align-items: baseline; gap: 12px; font-size: 0.9rem; color: #a7d9c1; }
-.sc.mine { color: #4fd08a; }
+.sc.a.mine { color: #4fd08a; }
+.sc.b.mine { color: #f0a24f; }
 .sc-target { color: #3f6b56; font-size: 0.8rem; }
-.tb-taker { font-size: 0.85rem; color: #ffe08a; }
+.tb-taker {
+  font-size: 0.85rem; font-weight: 800; color: #ffe08a; display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 999px; background: rgba(255,224,138,0.12); border: 1px solid rgba(255,224,138,0.5);
+}
+.tb-taker-suit { font-size: 1.1em; font-weight: 900; margin-left: 2px; }
+.tb-taker-suit.red { color: #ff6b6b; } .tb-taker-suit.black { color: #eafff3; }
 .tb-stop { background: transparent; color: #7a9a8b; border: 1px solid #2f5a44; border-radius: 7px; padding: 4px 10px; font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: 0.15s; }
 .tb-stop:hover { color: #ff8a8a; border-color: #ff8a8a; }
 
@@ -1155,7 +1227,7 @@ onUnmounted(() => {
 .btn-act.take { background: #1f6c44; }
 .btn-act.red { color: #ff8a8a; }
 
-.my-hand { display: flex; align-items: flex-end; padding: 28px 6px 10px; overflow-x: auto; overflow-y: hidden; }
+.my-hand { display: flex; align-items: flex-end; justify-content: safe center; padding: 28px 6px 10px; overflow-x: auto; overflow-y: hidden; }
 .hand-card { flex-shrink: 0; border-radius: 7px; transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease; cursor: default; }
 .hand-card .hc { width: 110px; height: 160px; }
 /* jouables : légère mise en avant + anneau vert discret */
@@ -1298,7 +1370,8 @@ onUnmounted(() => {
     color: #8fc4ab; font-weight: 700; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.5px;
     border-bottom: 1px solid rgba(79,208,138,0.25);
   }
-  .ss-table thead th.mine { color: #4fd08a; }
+  .ss-table thead th.a.mine { color: #4fd08a; }
+  .ss-table thead th.b.mine { color: #f0a24f; }
   .ss-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.025); }
   .ss-table tbody td { color: #cfeadd; border-bottom: 1px solid rgba(79,208,138,0.06); }
   .ss-hand { color: #7fb99e; font-weight: 700; }
