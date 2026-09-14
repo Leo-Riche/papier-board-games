@@ -359,7 +359,7 @@
                 @click="handleTokenClick(n)"
                 :title="getTokenTitle(n)"
               >
-                <TokenChip :count="n" :size="tokenChipSize" :phase="phase" />
+                <TokenChip :count="n" :size="72" :phase="phase" />
                 <div class="token-owner-label">{{ getTokenOwnerLabel(n) }}</div>
               </div>
             </div>
@@ -553,9 +553,6 @@ const tokenHistory = ref([])
 const showHandsModal = ref(false)
 const currentHeistLog = ref([])
 const oneShotMode = ref(false)
-
-// Shrink the chips when the table is large so the token grid stays compact
-const tokenChipSize = computed(() => (totalTokens.value > 6 ? 56 : 72))
 
 // ── Hand rankings reference ────────────────────
 const HAND_RANKINGS = [
@@ -1427,6 +1424,9 @@ onMounted(() => {
   flex-direction: column;
   background: #100808;
   overflow-y: auto;
+  /* Réserve la gouttière : sans ça l'apparition du scrollbar au flop
+     rétrécit le panneau et relayoute la grille de jetons. */
+  scrollbar-gutter: stable;
 }
 
 .tokens-container, .opponents-container {
@@ -1447,14 +1447,25 @@ onMounted(() => {
 /* Tokens grid */
 .tokens-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  /* Nombre de colonnes figé : le layout ne doit pas changer d'une phase
+     à l'autre quand le contenu du panneau grandit. */
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
 
 .tokens-grid.compact {
-  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
   gap: 6px;
+}
+
+/* Le jeton s'adapte à la largeur de sa colonne (max = sa taille naturelle) */
+.token-wrap :deep(.token-chip-svg) {
+  width: 100%;
+  height: auto;
+  max-width: 72px;
+}
+.tokens-grid.compact .token-wrap :deep(.token-chip-svg) {
+  max-width: 58px;
 }
 
 .token-wrap {
@@ -1462,6 +1473,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   cursor: pointer;
   border-radius: 12px;
   padding: 6px 4px;
@@ -2211,7 +2223,7 @@ onMounted(() => {
   .comm-card-placeholder { width: 64px; height: 90px; }
   .my-pocket-card { width: 79px; height: 110px; }
   .poker-table { padding: 14px 16px; }
-  .tokens-grid { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 6px; }
+  .tokens-grid { gap: 6px; }
   .token-cell { height: 60px; }
   .token-number { font-size: 1.4rem; }
   .waiting-screen { padding: 28px 16px; gap: 18px; }
