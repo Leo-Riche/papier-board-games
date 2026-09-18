@@ -7,18 +7,18 @@
     class="token-chip-svg"
   >
     <defs>
-      <radialGradient :id="`grad-main-${count}-${phase}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-main-${uid}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.highlight" />
         <stop offset="100%" :stop-color="colors.main" />
       </radialGradient>
-      <radialGradient :id="`grad-rim-${count}-${phase}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-rim-${uid}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.rimHighlight" />
         <stop offset="100%" :stop-color="colors.rim" />
       </radialGradient>
-      <filter :id="`shadow-${count}-${phase}`" x="-15%" y="-15%" width="130%" height="130%">
+      <filter :id="`shadow-${uid}`" x="-15%" y="-15%" width="130%" height="130%">
         <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.55)" />
       </filter>
-      <filter :id="`inner-${count}-${phase}`" x="-20%" y="-20%" width="140%" height="140%">
+      <filter :id="`inner-${uid}`" x="-20%" y="-20%" width="140%" height="140%">
         <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.4)" />
       </filter>
     </defs>
@@ -27,7 +27,7 @@
     <circle cx="50" cy="52" r="47" fill="rgba(0,0,0,0.3)" />
 
     <!-- Outer rim ring -->
-    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${uid})`" />
 
     <!-- Rim notches (8 rectangular cuts at 45° intervals) -->
     <g v-for="i in 8" :key="`notch-${i}`">
@@ -41,7 +41,7 @@
     </g>
 
     <!-- Inner rim (second smaller ring) -->
-    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${uid})`" />
 
     <!-- Rim notches inner ring (smaller, 8 at same positions) -->
     <g v-for="i in 8" :key="`notch-in-${i}`">
@@ -55,7 +55,7 @@
     </g>
 
     <!-- Main body circle -->
-    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${count}-${phase})`" :filter="`url(#inner-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${uid})`" :filter="`url(#inner-${uid})`" />
 
     <!-- Stars -->
     <path
@@ -83,6 +83,10 @@ const props = defineProps({
   phase: {         // 'preflop' | 'flop' | 'turn' | 'river'
     type: String,
     default: 'preflop'
+  },
+  dark: {          // dark face (Effraction cards 2 and 6)
+    type: Boolean,
+    default: false
   }
 })
 
@@ -123,7 +127,22 @@ const PHASE_PALETTES = {
   }
 }
 
-const colors = computed(() => PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['preflop'])
+const colors = computed(() => {
+  const palette = PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['preflop']
+  if (!props.dark) return palette
+  // Dark face: black body, rim keeps the phase color
+  return {
+    main:        '#1c1c1c',
+    highlight:   '#353535',
+    rim:         palette.rim,
+    rimHighlight:palette.rimHighlight,
+    notch:       'rgba(0,0,0,0.45)',
+    star:        palette.highlight
+  }
+})
+
+// SVG ids must be unique per variant, several chips share the page
+const uid = computed(() => `${props.count}-${props.phase}${props.dark ? '-dark' : ''}`)
 
 // ── Star size scales with fewer stars ─────────────────────
 const starSize = computed(() => {

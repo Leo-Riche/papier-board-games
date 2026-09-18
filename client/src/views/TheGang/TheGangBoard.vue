@@ -40,6 +40,27 @@
         </button>
       </div>
 
+      <!-- CARTES EFFRACTION -->
+      <div class="effraction-settings">
+        <h3>Cartes Effraction <span v-if="!amIHost" class="settings-hint">(choisies par le chef)</span></h3>
+        <div class="effraction-mode-options">
+          <button v-for="opt in EFFRACTION_MODE_OPTIONS" :key="opt.value"
+                  class="effraction-mode-btn" :class="{ selected: effractionMode === opt.value }"
+                  :disabled="!amIHost" @click="setEffractionMode(opt.value)">
+            <span class="mode-label">{{ opt.label }}</span>
+            <span class="mode-desc">{{ opt.description }}</span>
+          </button>
+        </div>
+        <details v-if="effractionMode !== 'off' && effractionList.length" class="effraction-catalog">
+          <summary>Voir les {{ effractionList.length }} cartes Effraction</summary>
+          <ul>
+            <li v-for="c in effractionList" :key="c.id">
+              <strong>{{ c.number }}. {{ c.name }}</strong> : {{ c.description }}
+            </li>
+          </ul>
+        </details>
+      </div>
+
       <button v-if="amIHost" class="btn-primary"
         :disabled="allConnectedPlayers.length < 3 || allConnectedPlayers.length > 9"
         @click="startGame">
@@ -56,12 +77,82 @@
           <li>⚠️ <strong>Aucune communication verbale</strong> sur vos cartes !</li>
           <li>✅ Au River, tous valident → Showdown automatique</li>
           <li>🏦 Gagnez <strong>3 braquages</strong> avant 3 alarmes</li>
+          <li v-if="effractionMode !== 'off'">🃏 Après chaque braquage réussi, tous votent pour tirer une <strong>carte Effraction</strong>
+            ({{ effractionMode === 'replace' ? 'elle remplace la précédente' : 'elles se cumulent' }})</li>
         </ul>
       </div>
     </div>
 
     <!-- ============ PLAYING SCREEN ============ -->
-    <div v-else-if="gameStatus === 'playing' || gameStatus === 'showdown'" class="playing-screen">
+    <div v-else-if="['playing', 'designation', 'showdown'].includes(gameStatus)" class="playing-screen">
+
+      <!-- DESIGNATION OVERLAY (Scan rétinien / Lecteur d'empreintes digitales) -->
+      <Transition name="showdown-anim">
+        <div v-if="gameStatus === 'designation' && designation" class="showdown-overlay">
+          <div class="showdown-panel">
+            <div class="showdown-banner designation">🔍 CONTRÔLE DE SÉCURITÉ</div>
+
+            <div v-if="designation.isTarget" class="designation-target-msg">
+              Vous avez le jeton rouge le plus étoilé. Les autres doivent deviner vos cartes :
+              <strong>ne dites rien et ne donnez aucun indice !</strong>
+            </div>
+            <p v-else class="designation-intro">
+              Désignez ensemble ce que possède <strong>{{ designation.targetName }}</strong>
+              (jeton rouge le plus étoilé). Une erreur fait échouer le braquage.
+            </p>
+
+            <div class="sd-section-label">CARTES COMMUNES</div>
+            <div class="sd-community">
+              <PlayingCard v-for="card in communityCards" :key="card.suit + card.value"
+                           :card="card" class="sd-comm-card" />
+            </div>
+
+            <div v-if="designation.needsRank" class="designation-field">
+              <div class="sd-section-label">SCAN RÉTINIEN : RANG D'UNE DE SES CARTES</div>
+              <div class="designation-options">
+                <button v-for="r in RANK_OPTIONS" :key="r.value" class="designation-opt"
+                        :class="{ selected: designation.rank === r.value }"
+                        :disabled="designation.isTarget"
+                        @click="setDesignation('rank', r.value)">{{ r.label }}</button>
+              </div>
+            </div>
+
+            <div v-if="designation.needsHand" class="designation-field">
+              <div class="sd-section-label">EMPREINTES DIGITALES : SA COMBINAISON</div>
+              <div class="designation-options">
+                <button v-for="h in HAND_OPTIONS" :key="h.value" class="designation-opt"
+                        :class="{ selected: designation.hand === h.value }"
+                        :disabled="designation.isTarget"
+                        @click="setDesignation('hand', h.value)">{{ h.label }}</button>
+              </div>
+            </div>
+
+            <div class="action-block-header">
+              <span class="action-title">Validations</span>
+              <span class="vote-count-badge green">{{ designation.validationCount }}/{{ designation.requiredCount }}</span>
+            </div>
+            <div class="vote-players">
+              <div v-for="opp in opponents.filter(o => o.name !== designation.targetName)" :key="opp.id"
+                   class="vote-player-chip" :class="{ 'voted-green': opp.hasDesignationValidated }">
+                {{ opp.name.split(' ')[0] }}
+                <span class="vote-chip-mark">{{ opp.hasDesignationValidated ? '✓' : '' }}</span>
+              </div>
+              <div v-if="!designation.isTarget" class="vote-player-chip is-me" :class="{ 'voted-green': designation.myHasValidated }">
+                Moi
+                <span class="vote-chip-mark">{{ designation.myHasValidated ? '✓' : '' }}</span>
+              </div>
+            </div>
+            <button v-if="!designation.isTarget" class="btn-validate"
+                    :class="{ validated: designation.myHasValidated }"
+                    :disabled="designation.myHasValidated || !designationComplete"
+                    @click="validateDesignation">
+              <span v-if="designation.myHasValidated">✅ Validé</span>
+              <span v-else-if="!designationComplete">Choisissez d'abord une réponse</span>
+              <span v-else>✅ Valider la désignation</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
 
       <!-- SHOWDOWN OVERLAY -->
       <Transition name="showdown-anim">
@@ -101,6 +192,17 @@
               </div>
             </div>
 
+            <div v-if="showdownResult.designation" class="sd-designation">
+              <div class="sd-section-label">CONTRÔLE DE SÉCURITÉ ({{ showdownResult.designation.targetName }})</div>
+              <div v-if="showdownResult.designation.rankGuess" class="sd-connector" :class="showdownResult.designation.rankCorrect ? 'ok' : 'bad'">
+                {{ showdownResult.designation.rankCorrect ? '✓' : '✗' }} Rang désigné : {{ showdownResult.designation.rankGuess }}
+              </div>
+              <div v-if="showdownResult.designation.handGuess" class="sd-connector" :class="showdownResult.designation.handCorrect ? 'ok' : 'bad'">
+                {{ showdownResult.designation.handCorrect ? '✓' : '✗' }} Combinaison désignée : {{ showdownResult.designation.handGuess }}
+                <span v-if="!showdownResult.designation.handCorrect">(réelle : {{ showdownResult.designation.actualHand }})</span>
+              </div>
+            </div>
+
             <div class="sd-score-recap">
               <div class="sd-score-item">
                 <span class="sd-stars">{{ '★'.repeat(oneShotMode ? showdownResult.heists : Math.min(showdownResult.heists, 3)) }}{{ oneShotMode ? '' : '☆'.repeat(Math.max(0, 3 - showdownResult.heists)) }}</span>
@@ -113,7 +215,43 @@
               </div>
             </div>
 
-            <button v-if="amIHost" class="btn-primary" @click="handleNextHeist">🔫 Prochain braquage</button>
+            <!-- Effraction card draw after a successful heist -->
+            <div v-if="effractionVoteRequired" class="effraction-vote-block">
+              <template v-if="!effractionDraw">
+                <div class="action-block-header">
+                  <span class="action-title">🃏 Tirage d'une carte Effraction</span>
+                  <span class="vote-count-badge">{{ effractionVoteCount }}/{{ totalTokens }}</span>
+                </div>
+                <div class="vote-players">
+                  <div v-for="opp in opponents" :key="opp.id" class="vote-player-chip" :class="{ voted: opp.hasEffractionVoted }">
+                    {{ opp.name.split(' ')[0] }}
+                    <span class="vote-chip-mark">{{ opp.hasEffractionVoted ? '✓' : '' }}</span>
+                  </div>
+                  <div class="vote-player-chip is-me" :class="{ voted: myHasEffractionVoted }">
+                    Moi
+                    <span class="vote-chip-mark">{{ myHasEffractionVoted ? '✓' : '' }}</span>
+                  </div>
+                </div>
+                <button class="btn-vote" :disabled="myHasEffractionVoted" @click="handleEffractionVote">
+                  {{ myHasEffractionVoted ? 'En attente des autres joueurs...' : '🃏 Tirer une carte Effraction' }}
+                </button>
+              </template>
+              <div v-else class="effraction-drawn">
+                <div class="sd-section-label">NOUVELLE CARTE EFFRACTION</div>
+                <div class="effraction-card drawn">
+                  <span class="effraction-number">{{ effractionDraw.card.number }}</span>
+                  <div class="effraction-text">
+                    <span class="effraction-name">{{ effractionDraw.card.name }}</span>
+                    <span class="effraction-desc">{{ effractionDraw.card.description }}</span>
+                  </div>
+                </div>
+                <p v-if="effractionDraw.replaced" class="effraction-replaced">
+                  Remplace {{ effractionDraw.replaced.number }}. {{ effractionDraw.replaced.name }}
+                </p>
+              </div>
+            </div>
+
+            <button v-if="amIHost" class="btn-primary" :disabled="effractionVoteRequired && !effractionDraw" @click="handleNextHeist">🔫 Prochain braquage</button>
             <p v-else class="waiting-msg-overlay">En attente du chef de salle...</p>
           </div>
         </div>
@@ -140,6 +278,13 @@
           <span class="score-sep">|</span>
           <span class="score-alarms" :title="`${alarms} alarmes`">
             <span v-for="i in 3" :key="i" :class="i <= alarms ? 'alarm-on' : 'alarm-off'">!</span>
+          </span>
+        </div>
+
+        <!-- Cartes Effraction actives -->
+        <div v-if="activeEffractions.length" class="effraction-badges">
+          <span v-for="c in activeEffractions" :key="c.id" class="effraction-badge" :title="`${c.name} : ${c.description}`">
+            🃏 {{ c.number }}<span class="effraction-badge-name"> · {{ c.name }}</span>
           </span>
         </div>
 
@@ -249,7 +394,7 @@
                 MES CARTES
                 <span v-if="myTokenNumber !== null" class="my-token-inline">
                   — Jeton <strong>{{ myTokenNumber }}</strong>
-                  <button class="btn-release-inline" @click="handleReleaseToken">✕</button>
+                  <button v-if="!lockedTokens.includes(myTokenNumber)" class="btn-release-inline" @click="handleReleaseToken">✕</button>
                 </span>
                 <span v-else class="warn-inline">⚠️ Pas de jeton</span>
               </div>
@@ -359,7 +504,7 @@
                 @click="handleTokenClick(n)"
                 :title="getTokenTitle(n)"
               >
-                <TokenChip :count="n" :size="72" :phase="phase" />
+                <TokenChip :count="n" :size="72" :phase="phase" :dark="darkTokens.includes(n)" />
                 <div class="token-owner-label">{{ getTokenOwnerLabel(n) }}</div>
               </div>
             </div>
@@ -368,7 +513,26 @@
               <span><span class="dot dot-free"></span> Libre</span>
               <span><span class="dot dot-mine"></span> Mon jeton</span>
               <span><span class="dot dot-taken"></span> Pris (clic = voler)</span>
+              <span v-if="darkTokens.length"><span class="dot dot-dark"></span> Sombre (une fois pris, bloqué jusqu'à la phase suivante)</span>
             </div>
+          </div>
+
+          <!-- CARTES EFFRACTION ACTIVES -->
+          <div v-if="effractionMode !== 'off'" class="effraction-container">
+            <div class="panel-header">
+              <span class="panel-title">EFFRACTIONS</span>
+              <span class="panel-subtitle">{{ effractionMode === 'replace' ? 'remplacement' : 'cumul' }}</span>
+            </div>
+            <div v-if="activeEffractions.length" class="effraction-list">
+              <div v-for="c in activeEffractions" :key="c.id" class="effraction-card">
+                <span class="effraction-number">{{ c.number }}</span>
+                <div class="effraction-text">
+                  <span class="effraction-name">{{ c.name }}</span>
+                  <span class="effraction-desc">{{ c.description }}</span>
+                </div>
+              </div>
+            </div>
+            <p v-else class="effraction-empty">Aucune carte Effraction pour l'instant.</p>
           </div>
 
           <!-- OPPONENTS -->
@@ -519,6 +683,16 @@ const getCardUrl = (card) => {
 
 const PHASES = ['preflop', 'flop', 'turn', 'river']
 const PHASE_LABELS = { preflop: 'Pré-flop', flop: 'Flop', turn: 'Turn', river: 'River' }
+const EFFRACTION_MODE_OPTIONS = [
+  { value: 'off', label: 'Désactivées', description: 'Partie classique, sans cartes Effraction' },
+  { value: 'replace', label: 'Remplacement', description: 'Chaque nouvelle carte remplace la précédente' },
+  { value: 'stack', label: 'Cumul', description: 'Les cartes se cumulent (sauf incompatibles)' }
+]
+const RANK_OPTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(value => ({
+  value, label: { 11: 'Valet', 12: 'Dame', 13: 'Roi', 14: 'As' }[value] ?? String(value)
+}))
+const HAND_OPTIONS = ['Carte haute', 'Paire', 'Double paire', 'Brelan', 'Suite', 'Couleur',
+  'Full House', 'Carré', 'Quinte Flush', 'Quinte Flush Royale'].map((label, i) => ({ value: i + 1, label }))
 
 const route = useRoute()
 const router = useRouter()
@@ -553,6 +727,21 @@ const tokenHistory = ref([])
 const showHandsModal = ref(false)
 const currentHeistLog = ref([])
 const oneShotMode = ref(false)
+const darkTokens = ref([])
+const lockedTokens = ref([])
+
+// Cartes Effraction
+const effractionMode = ref('off')
+const effractionList = ref([])
+const activeEffractions = ref([])
+const effractionVoteRequired = ref(false)
+const effractionVoteCount = ref(0)
+const myHasEffractionVoted = ref(false)
+const effractionDraw = ref(null)
+const designation = ref(null)
+const designationComplete = computed(() => !!designation.value &&
+  (!designation.value.needsRank || designation.value.rank !== null) &&
+  (!designation.value.needsHand || designation.value.hand !== null))
 
 // ── Hand rankings reference ────────────────────
 const HAND_RANKINGS = [
@@ -747,6 +936,7 @@ const getTokenClass = (n) => {
   return 'token-free'
 }
 const getTokenTitle = (n) => {
+  if (lockedTokens.value.includes(n)) return "Jeton sombre : il ne change plus de propriétaire avant la phase suivante"
   if (myTokenNumber.value === n) return 'Mon jeton — cliquer pour libérer'
   if (takenTokens.value?.[n]) return `Pris par ${takenTokens.value[n]} — cliquer pour voler`
   return `Prendre le jeton ${n}`
@@ -761,7 +951,18 @@ const handleTokenClick = (n) => {
 }
 
 // ── Actions ────────────────────────────────────
-const startGame = () => socket.emit('start_thegang', { roomCode, options: { oneShotMode: oneShotMode.value } })
+const startGame = () => socket.emit('start_thegang', {
+  roomCode,
+  options: { oneShotMode: oneShotMode.value, effractionMode: effractionMode.value }
+})
+const setEffractionMode = (mode) => {
+  if (!amIHost.value || mode === effractionMode.value) return
+  effractionMode.value = mode
+  socket.emit('thegang_sync_option', { roomCode, key: 'effractionMode', value: mode })
+}
+const handleEffractionVote = () => socket.emit('thegang_action', { roomCode, actionType: 'effraction_vote', payload: {} })
+const setDesignation = (field, value) => socket.emit('thegang_action', { roomCode, actionType: 'designation_set', payload: { field, value } })
+const validateDesignation = () => socket.emit('thegang_action', { roomCode, actionType: 'designation_validate', payload: {} })
 const toggleOneShotMode = () => {
   if (!amIHost.value) return
   oneShotMode.value = !oneShotMode.value
@@ -784,7 +985,10 @@ onMounted(() => {
     const savedName = localStorage.getItem('temp_player_name')
     if (savedName) socket.emit('set_player_name', { name: savedName, roomCode })
     else socket.emit('join_room', roomCode)
+    socket.emit('thegang_get_effractions')
   })
+
+  socket.on('thegang_effractions', (list) => { effractionList.value = list })
 
   socket.on('room_full', (msg) => { alert(msg); socket.disconnect(); router.push('/') })
   socket.on('thegang_error', (msg) => alert(msg))
@@ -802,6 +1006,7 @@ onMounted(() => {
 
   socket.on('thegang_option_updated', ({ key, value }) => {
     if (key === 'oneShotMode') oneShotMode.value = value
+    if (key === 'effractionMode') effractionMode.value = value
   })
 
   socket.on('game_started', () => {
@@ -813,7 +1018,7 @@ onMounted(() => {
   })
 
   socket.on('update_board_state', (data) => {
-    gameStatus.value = data.status === 'finished' ? 'finished' : data.status === 'showdown' ? 'showdown' : 'playing'
+    gameStatus.value = ['finished', 'showdown', 'designation'].includes(data.status) ? data.status : 'playing'
     phase.value = data.phase
     heists.value = data.heists
     alarms.value = data.alarms
@@ -833,6 +1038,15 @@ onMounted(() => {
     if (data.tokenHistory) tokenHistory.value = data.tokenHistory
     if (data.currentHeistLog) currentHeistLog.value = data.currentHeistLog
     if (data.oneShotMode !== undefined) oneShotMode.value = data.oneShotMode
+    darkTokens.value = data.darkTokens ?? []
+    lockedTokens.value = data.lockedTokens ?? []
+    effractionMode.value = data.effractionMode ?? 'off'
+    activeEffractions.value = data.activeEffractions ?? []
+    effractionVoteRequired.value = data.effractionVoteRequired
+    effractionVoteCount.value = data.effractionVoteCount
+    myHasEffractionVoted.value = data.myHasEffractionVoted
+    effractionDraw.value = data.effractionDraw
+    designation.value = data.designation
   })
 
   socket.on('action_log', (msg) => {
@@ -2132,6 +2346,134 @@ onMounted(() => {
   text-shadow: 0 0 20px rgba(231, 76, 60, 0.4);
 }
 
+/* ── CARTES EFFRACTION ────────────────────────── */
+.effraction-settings {
+  background: #1e1010;
+  padding: 20px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(231, 76, 60, 0.15);
+  max-width: 480px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.effraction-settings h3 { color: #e74c3c; font-size: 1rem; margin: 0 0 14px; font-weight: 700; }
+.settings-hint { color: #7f8c8d; font-size: 0.8rem; font-weight: 400; }
+.effraction-mode-options { display: flex; flex-direction: column; gap: 8px; }
+.effraction-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  color: #bdc3c7;
+  font-family: 'Outfit', sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.effraction-mode-btn:hover:not(:disabled) { border-color: rgba(231, 76, 60, 0.35); }
+.effraction-mode-btn:disabled { cursor: default; }
+.effraction-mode-btn.selected { border-color: #e74c3c; background: rgba(231, 76, 60, 0.1); color: #ecf0f1; }
+.mode-label { font-size: 0.95rem; font-weight: 700; }
+.mode-desc { font-size: 0.8rem; color: #95a5a6; }
+.effraction-catalog { margin-top: 14px; font-size: 0.85rem; color: #bdc3c7; }
+.effraction-catalog summary { cursor: pointer; color: #e74c3c; font-weight: 600; }
+.effraction-catalog ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.effraction-catalog strong { color: #ecf0f1; }
+
+.effraction-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.effraction-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  color: #d4af37;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.effraction-container {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(231, 76, 60, 0.08);
+}
+.effraction-list { display: flex; flex-direction: column; gap: 6px; }
+.effraction-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.06);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+.effraction-card.drawn { padding: 14px 16px; }
+.effraction-number {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: #d4af37;
+  color: #1a0f0f;
+  font-weight: 900;
+  font-size: 0.85rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.effraction-text { display: flex; flex-direction: column; gap: 2px; }
+.effraction-name { font-size: 0.9rem; font-weight: 700; color: #d4af37; }
+.effraction-desc { font-size: 0.78rem; color: #bdc3c7; line-height: 1.4; }
+.effraction-empty { font-size: 0.8rem; color: #7f8c8d; font-style: italic; margin: 0; }
+
+.effraction-vote-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.04);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+.effraction-vote-block .btn-vote:disabled { opacity: 0.6; cursor: default; transform: none; }
+.effraction-drawn { display: flex; flex-direction: column; gap: 10px; }
+.effraction-replaced { margin: 0; font-size: 0.8rem; color: #95a5a6; font-style: italic; }
+.dot-dark { background: #1c1c1c; border: 1px solid #7f8c8d; }
+
+/* Contrôle de sécurité (Scan rétinien / Empreintes digitales) */
+.showdown-banner.designation { background: rgba(212, 175, 55, 0.12); color: #d4af37; border: 1px solid rgba(212, 175, 55, 0.3); }
+.designation-intro { margin: 0; font-size: 0.9rem; color: #bdc3c7; line-height: 1.5; }
+.designation-intro strong { color: #ecf0f1; }
+.designation-target-msg {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  color: #ecf0f1;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.designation-field { display: flex; flex-direction: column; gap: 8px; }
+.designation-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.designation-opt {
+  min-width: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: #bdc3c7;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.designation-opt:hover:not(:disabled) { border-color: rgba(212, 175, 55, 0.4); color: #ecf0f1; }
+.designation-opt:disabled { cursor: default; }
+.designation-opt.selected { border-color: #d4af37; background: rgba(212, 175, 55, 0.15); color: #d4af37; }
+.sd-designation { display: flex; flex-direction: column; gap: 4px; }
+
 /* ══════════════════════════════════════════════
    GAME OVER SCREEN
 ══════════════════════════════════════════════ */
@@ -2217,6 +2559,7 @@ onMounted(() => {
   .right-panel { width: 100%; min-width: 0; overflow: visible; }
   .top-bar { padding: 8px 14px; gap: 10px; }
   .top-bar h2 { font-size: 1.1rem; }
+  .effraction-badge-name { display: none; }
   .phase-label { display: none; }
   .comm-card-slot { width: 64px; height: 90px; }
   .comm-card { width: 64px; height: 90px; }
