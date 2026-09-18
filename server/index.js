@@ -412,8 +412,16 @@ io.on('connection', (socket) => {
         case 'release_token':     game.handleReleaseToken(socket.id); break;
         case 'validate':          game.handleValidate(socket.id); break;
         case 'next_heist':        game.handleNextHeist(socket.id); break;
+        case 'effraction_vote':   game.handleEffractionVote(socket.id); break;
+        case 'designation_set':   game.handleDesignationSet(socket.id, payload); break;
+        case 'designation_validate': game.handleDesignationValidate(socket.id); break;
       }
     }
+  });
+
+  // Liste des cartes Effraction affichée dans le lobby
+  socket.on('thegang_get_effractions', () => {
+    socket.emit('thegang_effractions', TheGang.EFFRACTION_LIST);
   });
 
   // ── BELOTE ─────────────────────────────────────────────────
