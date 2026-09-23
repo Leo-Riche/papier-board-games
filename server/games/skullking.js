@@ -387,6 +387,11 @@ class SkullKing {
         return this.state.trick.some(t => t.playerIndex === idx) || p.hand.length === 0;
       });
       if (othersPlayed) {
+        // Si le joueur n'a plus de cartes (la salve était sa dernière), on résout directement.
+        if (this.state.players[volleyPlay.playerIndex].hand.length === 0) {
+          this.resolveTrick();
+          return;
+        }
         this.state.awaitingVolleyPlay = true;
         this.state.lastVolleyPlayerIdx = volleyPlay.playerIndex;
         this.state.currentTurnIndex = volleyPlay.playerIndex;
@@ -479,14 +484,15 @@ class SkullKing {
     if (davyJonesPlay) {
       const destroyed = plays.filter(p => LEVIATHANS.includes(p.card.type));
       const davyJonesBonus = destroyed.length * 20;
+      const davyJonesPlayerIndex = davyJonesPlay.playerIndex;
       const remaining = plays.filter(p => !LEVIATHANS.includes(p.card.type) && p.card.type !== 'davy_jones');
       const all = plays.filter(p => !LEVIATHANS.includes(p.card.type));
       if (remaining.length === 0) {
-        return { destroyed: false, winnerPlayerIndex: davyJonesPlay.playerIndex, leadNextIndex: davyJonesPlay.playerIndex, effectivePlays: all, davyJonesBonus };
+        return { destroyed: false, winnerPlayerIndex: davyJonesPlay.playerIndex, leadNextIndex: davyJonesPlay.playerIndex, effectivePlays: all, davyJonesBonus, davyJonesPlayerIndex };
       }
       const w = this._resolveNormal(remaining);
       const winner = remaining[w];
-      return { destroyed: false, winnerPlayerIndex: winner.playerIndex, leadNextIndex: winner.playerIndex, effectivePlays: all, davyJonesBonus };
+      return { destroyed: false, winnerPlayerIndex: winner.playerIndex, leadNextIndex: winner.playerIndex, effectivePlays: all, davyJonesBonus, davyJonesPlayerIndex };
     }
 
     // ── Étape 2 : Supplice de la planche (retire un Pirate avant résolution) ──
@@ -602,10 +608,18 @@ class SkullKing {
       winner.tricksWon += 1;
 
       bonusInfo = this._computeBonus(plays, result.effectivePlays, winnerPlayerIndex);
-      winner.roundBonus += bonusInfo.bonus + result.davyJonesBonus;
+      winner.roundBonus += bonusInfo.bonus;
+
+      // Le bonus du Casier de Davy Jones va au joueur qui a posé le Casier,
+      // pas au gagnant du pli.
+      if (result.davyJonesBonus > 0 && result.davyJonesPlayerIndex != null) {
+        const djPlayer = this.state.players[result.davyJonesPlayerIndex];
+        djPlayer.roundBonus += result.davyJonesBonus;
+        this.io.to(this.roomCode).emit('action_log',
+          `⚰️ ${djPlayer.name} envoie les léviathans au casier : +${result.davyJonesBonus} pts.`);
+      }
 
       const allDetails = [...bonusInfo.details];
-      if (result.davyJonesBonus > 0) allDetails.push(`+${result.davyJonesBonus} (Casier de Davy Jones)`);
 
       // Cartes 7/8 additionnelles : ±5 au gagnant (appliqué en fin de manche si le pari est juste).
       for (const pl of plays) {
