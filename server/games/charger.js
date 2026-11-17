@@ -30,6 +30,8 @@ class Charger {
     this.roomCode = roomCode;
     this.io = io;
     this.players = playersData;
+    // Hôte identifié par son pseudo (stable à travers les reconnexions, contrairement au socket id)
+    this.hostName = playersData[0]?.name || null;
 
     this.state = {
       status: 'waiting',
@@ -109,22 +111,18 @@ class Charger {
     if (!isActive) return;
 
     if (actionType === 'draw') {
-      if (this.state.deck.length === 0) {
-        // Reshuffle discard (keep last card)
-        const last = this.state.discard.pop();
-        this.state.deck = [...this.state.discard];
-        for (let i = this.state.deck.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [this.state.deck[i], this.state.deck[j]] = [this.state.deck[j], this.state.deck[i]];
-        }
-        this.state.discard = last ? [last] : [];
-        this.io.to(this.roomCode).emit('action_log', `🔀 La pioche est vide, on mélange la défausse.`);
-      }
+      if (this.state.deck.length === 0) this.reshuffleDiscardIntoDeck();
 
       const drawnCard = this.state.deck.pop();
+      if (!drawnCard) {
+        // Aucune carte nulle part (cas extrême) : on passe le tour proprement plutôt que de crasher
+        this.io.to(this.roomCode).emit('action_log', `⏭️ Plus aucune carte en jeu, ${player.name} passe son tour.`);
+        this.advanceTurn();
+        return;
+      }
       player.drawnCard = drawnCard; // temporary, will be used in next action
 
-      this.io.to(this.roomCode).emit('action_log', `🃏 ${player.name} pioche une carte.`);
+      this.io.to(this.roomCode).emit('action_log', `🎴 ${player.name} pioche une carte.`);
       this.broadcastState();
     }
 
@@ -197,14 +195,14 @@ class Charger {
       // Actually rules say charge anyone — the cards are placed next to that player
       // We'll implement: charge goes to target's charged pile (others can set traps... interesting!)
       if (target.charged.length >= 2) {
-        this.io.to(this.roomCode).emit('action_log', `⚡ ${target.name} a déjà 2 cartes chargées !`);
+        this.io.to(this.roomCode).emit('action_log', `☢️ ${target.name} a déjà 2 cartes chargées !`);
         return;
       }
 
       target.charged.push(player.drawnCard);
       player.drawnCard = null;
 
-      this.io.to(this.roomCode).emit('action_log', `⚡ ${player.name} charge ${target.id === player.id ? 'ses propres cartes' : target.name + ' (+1 carte chargée)'}.`);
+      this.io.to(this.roomCode).emit('action_log', `☢️ ${player.name} charge ${target.id === player.id ? 'ses propres cartes' : target.name + ' (+1 carte chargée)'}.`);
       this.advanceTurn();
     }
 
@@ -218,16 +216,28 @@ class Charger {
   }
 
   resolveAttack() {
+    if (!this.state.pendingAction) return; // déjà résolue (double clic sur OK, etc.)
     const { attackerId, targetId, attackCards } = this.state.pendingAction;
     this.state.pendingAction = null;
 
     const attacker = this.state.players.find(p => p.id === attackerId);
     const target = this.state.players.find(p => p.id === targetId);
 
-    if (!attacker || !target) return;
+    if (!attacker || !target) {
+      console.error(`⚠️ resolveAttack: attaquant ou cible introuvable (attacker=${attackerId}, target=${targetId})`);
+      this.advanceTurn();
+      return;
+    }
 
     const totalAttack = attackCards.reduce((s, c) => s + c.value, 0);
+    if (!target.shield) {
+      console.error(`⚠️ resolveAttack: ${target.name} n'a pas de bouclier, attaque annulée.`);
+      attackCards.forEach(c => this.state.discard.push(c));
+      this.advanceTurn();
+      return;
+    }
     const shieldValue = target.shield.value;
+    console.log(`[charger] resolveAttack: ${attacker.name} → ${target.name} | attaque ${totalAttack} vs bouclier ${shieldValue} | PV cible ${target.hp.reduce((s, c) => s + c.value, 0)}`);
 
     target.shieldRevealed = false;
     target.shieldPierced = true; // bouclier toujours visible après une attaque
@@ -257,11 +267,16 @@ class Charger {
     const newHpTarget = currentHpSum - damage;
 
 	if (newHpTarget <= 0) {
-      // Eliminated
+      // Eliminated : toutes ses cartes retournent dans la défausse pour rester en circulation
       target.hp.forEach(c => this.state.discard.push(c));
       target.hp = [];
+      if (target.shield) { this.state.discard.push(target.shield); target.shield = null; }
+      if (target.charged && target.charged.length > 0) {
+        target.charged.forEach(c => this.state.discard.push(c));
+        target.charged = [];
+      }
+      if (target.drawnCard) { this.state.discard.push(target.drawnCard); target.drawnCard = null; }
       target.eliminated = true;
-	  if (target.shield) { this.state.discard.push(target.shield); target.shield = null; }
 	  this.io.to(this.roomCode).emit('action_log', `💀 ${target.name} est éliminé(e) !`);
 
       const alive = this.getAlivePlayers();
@@ -276,15 +291,7 @@ class Charger {
     }
 
     // Reshuffle discard into deck if deck is empty
-    if (this.state.deck.length === 0) {
-      this.state.deck = [...this.state.discard];
-      for (let i = this.state.deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [this.state.deck[i], this.state.deck[j]] = [this.state.deck[j], this.state.deck[i]];
-      }
-      this.state.discard = [];
-      this.io.to(this.roomCode).emit('action_log', `🔀 La pioche est vide, on mélange la défausse.`);
-    }
+    if (this.state.deck.length === 0) this.reshuffleDiscardIntoDeck();
 
     // Replace ONE HP card: find which card can absorb the damage (card.value - damage >= 1)
     // Build allAvailable AFTER reshuffle so we have the full deck available
@@ -334,7 +341,23 @@ class Charger {
         return;
       }
 
-      console.error(`⚠️ Aucune carte de remplacement trouvée pour ${target.name} (dégâts: ${damage}, newHpTarget: ${newHpTarget})`);
+      // Dernier recours garanti : on reconstruit la main de PV avec des cartes
+      // (piochées si dispo, sinon synthétisées) dont la somme vaut exactement newHpTarget.
+      const hpValues = newHpTarget <= 1
+        ? [1]
+        : [Math.min(13, newHpTarget - 1), newHpTarget - Math.min(13, newHpTarget - 1)];
+      const takeCardOfValue = (v) => {
+        let idx = this.state.deck.findLastIndex(c => c.value === v);
+        if (idx !== -1) return this.state.deck.splice(idx, 1)[0];
+        idx = this.state.discard.findLastIndex(c => c.value === v);
+        if (idx !== -1) return this.state.discard.splice(idx, 1)[0];
+        return { suit: '♠', value: v, synthetic: true };
+      };
+      target.hp.forEach(c => this.state.discard.push(c));
+      target.hp = hpValues.map(takeCardOfValue);
+      target.hpRevealed = true;
+      target.shieldPierced = true;
+      this.io.to(this.roomCode).emit('action_log', `❤️ ${target.name} a maintenant ${newHpTarget} PV.`);
       this.advanceTurn();
       return;
     }
@@ -357,6 +380,18 @@ class Charger {
     if (idx !== -1) { this.state.discard.splice(idx, 1); return; }
     idx = this.state.deck.findLastIndex(c => c.suit === card.suit && c.value === card.value);
     if (idx !== -1) { this.state.deck.splice(idx, 1); }
+  }
+
+  reshuffleDiscardIntoDeck() {
+    if (this.state.discard.length === 0) return;
+    const cards = [...this.state.discard];
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+    this.state.deck.push(...cards);
+    this.state.discard = [];
+    this.io.to(this.roomCode).emit('action_log', `🔀 La pioche est vide, on mélange la défausse.`);
   }
 
   advanceTurn() {
@@ -385,6 +420,7 @@ class Charger {
     this.io.to(this.roomCode).emit('game_over', {
       reason: winner ? `${winner.name} est le dernier survivant !` : 'Partie terminée !',
       winner: winner ? { id: winner.id, name: winner.name } : null,
+      hostName: this.hostName,
       players: this.state.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -433,6 +469,7 @@ class Charger {
         discardTop: this.state.discard.length > 0 ? this.state.discard[this.state.discard.length - 1] : null,
         players: playersView,
         myId: player.id,
+        isHost: player.name === this.hostName,
         pendingAction: this.state.pendingAction ? {
           type: this.state.pendingAction.type,
           attackerId: this.state.pendingAction.attackerId,
@@ -447,11 +484,18 @@ class Charger {
 
   reconnectPlayer(newSocketId, playerName) {
     const player = this.state.players.find(p => p.name === playerName);
-    if (player) {
-      player.id = newSocketId;
-      return true;
+    if (!player) return false;
+
+    const oldId = player.id;
+    player.id = newSocketId;
+
+    // Reporter le nouvel id partout où l'ancien était référencé,
+    // sinon une attaque en cours reste bloquée (la cible ne peut plus la résoudre).
+    if (this.state.pendingAction) {
+      if (this.state.pendingAction.targetId === oldId) this.state.pendingAction.targetId = newSocketId;
+      if (this.state.pendingAction.attackerId === oldId) this.state.pendingAction.attackerId = newSocketId;
     }
-    return false;
+    return true;
   }
 }
 

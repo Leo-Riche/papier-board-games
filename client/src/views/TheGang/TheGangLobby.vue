@@ -3,7 +3,7 @@
     <header class="lobby-header">
       <div class="engraved-panel">
         <h1 class="game-title">THE GANG 🔫</h1>
-        <p class="subtitle">Coopératif · Poker silencieux · 3–6 joueurs</p>
+        <p class="subtitle">Coopératif · Poker silencieux · 3–9 joueurs</p>
       </div>
     </header>
 

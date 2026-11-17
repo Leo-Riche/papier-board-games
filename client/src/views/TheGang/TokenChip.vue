@@ -7,18 +7,18 @@
     class="token-chip-svg"
   >
     <defs>
-      <radialGradient :id="`grad-main-${count}-${phase}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-main-${uid}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.highlight" />
         <stop offset="100%" :stop-color="colors.main" />
       </radialGradient>
-      <radialGradient :id="`grad-rim-${count}-${phase}`" cx="40%" cy="35%" r="65%">
+      <radialGradient :id="`grad-rim-${uid}`" cx="40%" cy="35%" r="65%">
         <stop offset="0%" :stop-color="colors.rimHighlight" />
         <stop offset="100%" :stop-color="colors.rim" />
       </radialGradient>
-      <filter :id="`shadow-${count}-${phase}`" x="-15%" y="-15%" width="130%" height="130%">
+      <filter :id="`shadow-${uid}`" x="-15%" y="-15%" width="130%" height="130%">
         <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.55)" />
       </filter>
-      <filter :id="`inner-${count}-${phase}`" x="-20%" y="-20%" width="140%" height="140%">
+      <filter :id="`inner-${uid}`" x="-20%" y="-20%" width="140%" height="140%">
         <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.4)" />
       </filter>
     </defs>
@@ -27,7 +27,7 @@
     <circle cx="50" cy="52" r="47" fill="rgba(0,0,0,0.3)" />
 
     <!-- Outer rim ring -->
-    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="48" :fill="`url(#grad-rim-${uid})`" />
 
     <!-- Rim notches (8 rectangular cuts at 45° intervals) -->
     <g v-for="i in 8" :key="`notch-${i}`">
@@ -41,7 +41,7 @@
     </g>
 
     <!-- Inner rim (second smaller ring) -->
-    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="36" :fill="`url(#grad-rim-${uid})`" />
 
     <!-- Rim notches inner ring (smaller, 8 at same positions) -->
     <g v-for="i in 8" :key="`notch-in-${i}`">
@@ -55,7 +55,7 @@
     </g>
 
     <!-- Main body circle -->
-    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${count}-${phase})`" :filter="`url(#inner-${count}-${phase})`" />
+    <circle cx="50" cy="50" r="29" :fill="`url(#grad-main-${uid})`" :filter="`url(#inner-${uid})`" />
 
     <!-- Stars -->
     <path
@@ -72,7 +72,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  count: {         // token number (1–6)
+  count: {         // token number (1–9)
     type: Number,
     required: true
   },
@@ -83,6 +83,10 @@ const props = defineProps({
   phase: {         // 'preflop' | 'flop' | 'turn' | 'river'
     type: String,
     default: 'preflop'
+  },
+  dark: {          // dark face (Effraction cards 2 and 6)
+    type: Boolean,
+    default: false
   }
 })
 
@@ -123,11 +127,26 @@ const PHASE_PALETTES = {
   }
 }
 
-const colors = computed(() => PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['preflop'])
+const colors = computed(() => {
+  const palette = PHASE_PALETTES[props.phase] ?? PHASE_PALETTES['preflop']
+  if (!props.dark) return palette
+  // Dark face: black body, rim keeps the phase color
+  return {
+    main:        '#1c1c1c',
+    highlight:   '#353535',
+    rim:         palette.rim,
+    rimHighlight:palette.rimHighlight,
+    notch:       'rgba(0,0,0,0.45)',
+    star:        palette.highlight
+  }
+})
+
+// SVG ids must be unique per variant, several chips share the page
+const uid = computed(() => `${props.count}-${props.phase}${props.dark ? '-dark' : ''}`)
 
 // ── Star size scales with fewer stars ─────────────────────
 const starSize = computed(() => {
-  const sizes = { 1: 9.5, 2: 8.5, 3: 7.5, 4: 6.5, 5: 5.8, 6: 5.2 }
+  const sizes = { 1: 9.5, 2: 8.5, 3: 7.5, 4: 6.5, 5: 5.8, 6: 5.2, 7: 4.8, 8: 4.5, 9: 4.2 }
   return sizes[props.count] ?? 6
 })
 
@@ -165,10 +184,40 @@ const STAR_POSITIONS = {
     { x: 62, y: 50 },
     { x: 38, y: 63 },
     { x: 62, y: 63 }
+  ],
+  7: [
+    { x: 38, y: 36 },
+    { x: 62, y: 36 },
+    { x: 38, y: 50 },
+    { x: 50, y: 50 },
+    { x: 62, y: 50 },
+    { x: 38, y: 64 },
+    { x: 62, y: 64 }
+  ],
+  8: [
+    { x: 35, y: 36 },
+    { x: 50, y: 36 },
+    { x: 65, y: 36 },
+    { x: 40, y: 50 },
+    { x: 60, y: 50 },
+    { x: 35, y: 64 },
+    { x: 50, y: 64 },
+    { x: 65, y: 64 }
+  ],
+  9: [
+    { x: 35, y: 36 },
+    { x: 50, y: 36 },
+    { x: 65, y: 36 },
+    { x: 35, y: 50 },
+    { x: 50, y: 50 },
+    { x: 65, y: 50 },
+    { x: 35, y: 64 },
+    { x: 50, y: 64 },
+    { x: 65, y: 64 }
   ]
 }
 
-const starPositions = computed(() => STAR_POSITIONS[Math.max(1, Math.min(6, props.count))] ?? STAR_POSITIONS[1])
+const starPositions = computed(() => STAR_POSITIONS[Math.max(1, Math.min(9, props.count))] ?? STAR_POSITIONS[1])
 
 // ── 5-pointed star path generator ─────────────────────────
 const starPath = (cx, cy, r) => {

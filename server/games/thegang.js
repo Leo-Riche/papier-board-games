@@ -35,6 +35,73 @@ const getDetailedHandName = (rank, tiebreaker) => {
   }
 };
 const PHASES = ['preflop', 'flop', 'turn', 'river'];
+const FACE_VALUES = [11, 12, 13]; // J, Q, K
+
+// Hand categories for the "Lecteur d'empreintes digitales" designation
+const HAND_CATEGORIES = {
+  1: 'Carte haute', 2: 'Paire', 3: 'Double paire', 4: 'Brelan', 5: 'Suite',
+  6: 'Couleur', 7: 'Full House', 8: 'Carré', 9: 'Quinte Flush', 10: 'Quinte Flush Royale'
+};
+
+// Effraction cards, drawn after a successful heist (when enabled in the lobby).
+// `conflicts` lists cards that cannot be active at the same time (cumulative mode).
+const EFFRACTIONS = {
+  easy_open: {
+    number: 1, name: 'Ouverture facile',
+    description: 'Pas de jetons blancs : après la distribution, on passe directement au Flop.',
+    conflicts: ['motion_detectors', 'photo_barriers']
+  },
+  noise_sensors: {
+    number: 2, name: 'Capteurs de bruit',
+    description: "Le jeton 1 étoile est sombre du Pré-flop au Turn : une fois pris, il ne change plus de propriétaire.",
+    conflicts: []
+  },
+  motion_detectors: {
+    number: 3, name: 'Détecteurs de mouvement',
+    description: 'Si au moins une carte du Flop est une tête (V, D, R), le détenteur du jeton blanc 1 étoile défausse ses cartes et en pioche de nouvelles.',
+    conflicts: ['easy_open']
+  },
+  retina_scan: {
+    number: 4, name: 'Scan rétinien',
+    description: "Avant l'abattage, les autres doivent désigner ensemble le rang d'une des cartes du détenteur du jeton rouge le plus étoilé.",
+    conflicts: []
+  },
+  hasty_escape: {
+    number: 5, name: 'Fuite précipitée',
+    description: 'Pas de jetons orange : après le Flop, la 4e et la 5e carte sont révélées et on passe directement à la River.',
+    conflicts: []
+  },
+  vent_grille: {
+    number: 6, name: "Grille d'aération",
+    description: 'Le jeton le plus étoilé est sombre du Pré-flop au Turn : une fois pris, il ne change plus de propriétaire.',
+    conflicts: []
+  },
+  photo_barriers: {
+    number: 7, name: 'Barrières photoélectriques',
+    description: "Si aucune carte du Flop n'est une tête (V, D, R), le détenteur du jeton blanc le plus étoilé défausse ses cartes et en pioche de nouvelles.",
+    conflicts: ['easy_open']
+  },
+  power_outage: {
+    number: 8, name: "Panne d'électricité",
+    description: "Au début de chaque phase, tous les jetons sont défaussés et l'historique est masqué. À vous de vous en souvenir !",
+    conflicts: []
+  },
+  fingerprint: {
+    number: 9, name: "Lecteur d'empreintes digitales",
+    description: "Avant l'abattage, les autres doivent désigner ensemble la combinaison du détenteur du jeton rouge le plus étoilé.",
+    conflicts: []
+  },
+  cameras: {
+    number: 10, name: 'Caméras de surveillance',
+    description: 'Chacun joue avec 3 cartes personnelles au lieu de 2.',
+    conflicts: []
+  }
+};
+const EFFRACTION_MODES = ['off', 'replace', 'stack'];
+
+const toPublicEffraction = (id) => ({
+  id, number: EFFRACTIONS[id].number, name: EFFRACTIONS[id].name, description: EFFRACTIONS[id].description
+});
 
 const shuffle = (array) => {
   const arr = [...array];
@@ -147,9 +214,15 @@ class TheGang {
     this.players = playersData;
     this.hostId = playersData[0]?.id || null;
     this.oneShotMode = options.oneShotMode || false;
+    this.effractionMode = EFFRACTION_MODES.includes(options.effractionMode) ? options.effractionMode : 'off';
 
     this.state = {
-      status: 'playing',
+      activeEffractions: [],        // ids of active Effraction cards
+      effractionVotes: new Set(),   // votes to draw an Effraction card
+      effractionVoteRequired: false,
+      effractionDraw: null,         // { card, replaced } once drawn
+      designation: null,            // Scan rétinien / Empreintes digitales step
+      status: 'playing',            // playing | designation | showdown | finished
       phase: 'preflop',
       heists: 0,
       alarms: 0,
@@ -168,11 +241,31 @@ class TheGang {
     this.state.heists = 0;
     this.state.alarms = 0;
     this.state.tokenHistory = [];
+    this.state.activeEffractions = [];
     this.startNewHeist(true);
+  }
+
+  has(effractionId) {
+    return this.state.activeEffractions.includes(effractionId);
+  }
+
+  // Dark tokens (Effraction 2 and 6) exist from pre-flop to turn
+  isDarkToken(tokenNumber) {
+    if (this.state.phase === 'river') return false;
+    if (this.has('noise_sensors') && tokenNumber === 1) return true;
+    if (this.has('vent_grille') && tokenNumber === this.players.length) return true;
+    return false;
+  }
+
+  // A dark token taken during a phase cannot change owner until the next phase
+  isTokenLocked(player) {
+    return player.tokenNumber !== null && this.isDarkToken(player.tokenNumber) &&
+      player.darkLockPhase === this.state.phase;
   }
 
   startNewHeist(isFirstStart = false) {
     const deck = generateDeck();
+    const pocketSize = this.has('cameras') ? 3 : 2;
 
     // Preserve player IDs updated through reconnections
     const currentPlayers = this.state.players.length > 0
@@ -182,8 +275,9 @@ class TheGang {
     this.state.players = currentPlayers.map(p => ({
       id: p.id,
       name: p.name,
-      pocketCards: [deck.pop(), deck.pop()],
-      tokenNumber: null
+      pocketCards: Array.from({ length: pocketSize }, () => deck.pop()),
+      tokenNumber: null,
+      darkLockPhase: null   // phase during which a dark token was taken
     }));
 
     this.state.deck = deck;
@@ -194,9 +288,19 @@ class TheGang {
     this.state.status = 'playing';
     this.state.showdownResult = null;
     this.state.phaseLog = {}; // Reset live phase log for this new heist
+    this.state.effractionVotes = new Set();
+    this.state.effractionVoteRequired = false;
+    this.state.effractionDraw = null;
+    this.state.designation = null;
 
     if (isFirstStart) {
       this.io.to(this.roomCode).emit('game_started');
+    }
+
+    if (this.has('easy_open')) {
+      this.io.to(this.roomCode).emit('action_log', '🔓 Ouverture facile : pas de jetons blancs, direction le Flop !');
+      this._doAdvancePhase();
+      return;
     }
 
     this.broadcastState();
@@ -238,15 +342,30 @@ class TheGang {
     // Snapshot les jetons de la phase qui se termine
     this._recordPhaseTokens(this.state.phase);
 
-    const nextPhase = PHASES[phaseIndex + 1];
-    this.state.phase = nextPhase;
+    let nextPhase = PHASES[phaseIndex + 1];
 
     if (nextPhase === 'flop') {
       this.state.communityCards.push(
         this.state.deck.pop(), this.state.deck.pop(), this.state.deck.pop()
       );
+      this._applyFlopEffractions();
     } else if (nextPhase === 'turn' || nextPhase === 'river') {
       this.state.communityCards.push(this.state.deck.pop());
+    }
+
+    // Fuite précipitée: no orange tokens, reveal the 5th card and go straight to the river
+    if (nextPhase === 'turn' && this.has('hasty_escape')) {
+      this.io.to(this.roomCode).emit('action_log', '🚗 Fuite précipitée : pas de jetons orange, direction la River !');
+      this.state.communityCards.push(this.state.deck.pop());
+      nextPhase = 'river';
+    }
+
+    this.state.phase = nextPhase;
+
+    // Panne d'électricité: every token is discarded at the start of a new phase
+    if (this.has('power_outage')) {
+      this.state.players.forEach(p => { p.tokenNumber = null; });
+      this.io.to(this.roomCode).emit('action_log', "💡 Panne d'électricité : tous les jetons sont défaussés !");
     }
 
     // Reset both vote sets on phase change
@@ -257,6 +376,38 @@ class TheGang {
     this.broadcastState();
   }
 
+  // Détecteurs de mouvement / Barrières photoélectriques, checked when the flop is revealed
+  _applyFlopEffractions() {
+    const hasFace = this.state.communityCards.slice(0, 3).some(c => FACE_VALUES.includes(CARD_VALUES_MAP[c.value]));
+    if (this.has('motion_detectors') && hasFace) {
+      this._redrawPocketCards(1, '📡 Détecteurs de mouvement');
+    }
+    if (this.has('photo_barriers') && !hasFace) {
+      this._redrawPocketCards(this.players.length, '🔦 Barrières photoélectriques');
+    }
+  }
+
+  // The holder of the given white (pre-flop) token discards their cards and draws new ones
+  _redrawPocketCards(tokenNumber, label) {
+    const player = this.state.players.find(p => p.tokenNumber === tokenNumber);
+    if (!player) return;
+    const count = player.pocketCards.length;
+    player.pocketCards = Array.from({ length: count }, () => this.state.deck.pop());
+    this.io.to(this.roomCode).emit('action_log', `${label} : ${player.name} défausse ses cartes et en pioche ${count} nouvelles.`);
+  }
+
+  // Returns an error message if the move breaks a dark token rule, null otherwise
+  _tokenRestriction(player, tokenNumber) {
+    if (this.isTokenLocked(player)) {
+      return "Votre jeton est sombre : vous ne pourrez en changer qu'à la phase suivante.";
+    }
+    const holder = tokenNumber !== null && this.state.players.find(p => p.id !== player.id && p.tokenNumber === tokenNumber);
+    if (holder && this.isTokenLocked(holder)) {
+      return "Ce jeton est sombre : il ne pourra être volé qu'à la phase suivante.";
+    }
+    return null;
+  }
+
   handleTakeToken(socketId, tokenNumber) {
     if (this.state.status !== 'playing') return;
 
@@ -264,15 +415,22 @@ class TheGang {
     if (!player) return;
     if (player.tokenNumber === tokenNumber) return; // Already has it
 
+    const restriction = this._tokenRestriction(player, tokenNumber);
+    if (restriction) return this.io.to(socketId).emit('thegang_error', restriction);
+
     // Release player's current token
     player.tokenNumber = null;
 
     // Release the target token from its current holder
     const currentHolder = this.state.players.find(p => p.tokenNumber === tokenNumber);
-    if (currentHolder) currentHolder.tokenNumber = null;
+    if (currentHolder) {
+      currentHolder.tokenNumber = null;
+      currentHolder.darkLockPhase = null;
+    }
 
-    // Assign token
+    // Assign token (a dark token is locked for the rest of this phase)
     player.tokenNumber = tokenNumber;
+    player.darkLockPhase = this.isDarkToken(tokenNumber) ? this.state.phase : null;
 
     // Reset river validations AND phase votes when tokens change
     this.state.validations = new Set();
@@ -295,7 +453,11 @@ class TheGang {
     const player = this.state.players.find(p => p.id === socketId);
     if (!player || player.tokenNumber === null) return;
 
+    const restriction = this._tokenRestriction(player, null);
+    if (restriction) return this.io.to(socketId).emit('thegang_error', restriction);
+
     player.tokenNumber = null;
+    player.darkLockPhase = null;
     this.state.validations = new Set();
     this.state.phaseVotes = new Set();
     this.broadcastState();
@@ -311,6 +473,54 @@ class TheGang {
     this.io.to(this.roomCode).emit('action_log', `✅ ${name} a validé son classement.`);
 
     if (this.state.validations.size === this.state.players.length) {
+      if (this.has('retina_scan') || this.has('fingerprint')) {
+        this._startDesignation();
+      } else {
+        this.resolveShowdown();
+      }
+    } else {
+      this.broadcastState();
+    }
+  }
+
+  // ── Scan rétinien / Lecteur d'empreintes digitales ──────────
+  _startDesignation() {
+    const target = this.state.players.find(p => p.tokenNumber === this.players.length);
+    this.state.status = 'designation';
+    this.state.designation = {
+      targetId: target.id,
+      needsRank: this.has('retina_scan'),
+      needsHand: this.has('fingerprint'),
+      rank: null,
+      hand: null,
+      validations: new Set()
+    };
+    this.io.to(this.roomCode).emit('action_log', `🔍 Contrôle de sécurité : désignez ce que possède ${target.name} (qui ne doit rien dire !).`);
+    this.broadcastState();
+  }
+
+  handleDesignationSet(socketId, payload) {
+    const d = this.state.designation;
+    if (this.state.status !== 'designation' || !d || socketId === d.targetId) return;
+    if (!this.state.players.some(p => p.id === socketId)) return;
+
+    const value = Number(payload?.value);
+    if (payload?.field === 'rank' && d.needsRank && value >= 2 && value <= 14) d.rank = value;
+    else if (payload?.field === 'hand' && d.needsHand && HAND_CATEGORIES[value]) d.hand = value;
+    else return;
+
+    d.validations = new Set(); // Any change requires everyone to validate again
+    this.broadcastState();
+  }
+
+  handleDesignationValidate(socketId) {
+    const d = this.state.designation;
+    if (this.state.status !== 'designation' || !d || socketId === d.targetId) return;
+    if (!this.state.players.some(p => p.id === socketId)) return;
+    if ((d.needsRank && d.rank === null) || (d.needsHand && d.hand === null)) return;
+
+    d.validations.add(socketId);
+    if (d.validations.size === this.state.players.length - 1) {
       this.resolveShowdown();
     } else {
       this.broadcastState();
@@ -336,6 +546,25 @@ class TheGang {
       const correct = compareHandEvals(byToken[i].handEval, byToken[i + 1].handEval) <= 0;
       pairResults.push(correct);
       if (!correct) success = false;
+    }
+
+    // Extra conditions from Scan rétinien / Lecteur d'empreintes digitales
+    let designation = null;
+    const d = this.state.designation;
+    if (d) {
+      const target = playerHands.find(p => p.id === d.targetId);
+      designation = { targetName: target.name };
+      if (d.needsRank) {
+        designation.rankGuess = VALUE_DISPLAY_SINGLE[d.rank];
+        designation.rankCorrect = target.pocketCards.some(c => CARD_VALUES_MAP[c.value] === d.rank);
+        if (!designation.rankCorrect) success = false;
+      }
+      if (d.needsHand) {
+        designation.handGuess = HAND_CATEGORIES[d.hand];
+        designation.actualHand = HAND_CATEGORIES[target.handEval.rank];
+        designation.handCorrect = target.handEval.rank === d.hand;
+        if (!designation.handCorrect) success = false;
+      }
     }
 
     if (success) {
@@ -369,6 +598,7 @@ class TheGang {
       heists: this.state.heists,
       alarms: this.state.alarms,
       communityCards: this.state.communityCards,
+      designation,
       playerResults: byToken.map((p, i) => ({
         name: p.name,
         tokenNumber: p.tokenNumber,
@@ -411,13 +641,75 @@ class TheGang {
       this.state.status = 'showdown';
     }
 
+    // After a successful heist, everyone votes to draw an Effraction card
+    if (this.state.status === 'showdown' && success && this.effractionMode !== 'off') {
+      this.state.effractionVoteRequired = this.getDrawableEffractions().length > 0;
+      if (!this.state.effractionVoteRequired) {
+        this.io.to(this.roomCode).emit('action_log', '😅 Aucune carte Effraction compatible disponible, pas de tirage cette fois.');
+      }
+    }
+
     this.broadcastState();
+  }
+
+  // ── Effraction cards ─────────────────────────────────────────
+  getDrawableEffractions() {
+    const all = Object.keys(EFFRACTIONS);
+    if (this.effractionMode === 'replace') {
+      return all.filter(id => !this.has(id));
+    }
+    if (this.effractionMode === 'stack') {
+      return all.filter(id =>
+        !this.has(id) &&
+        !this.state.activeEffractions.some(active =>
+          EFFRACTIONS[active].conflicts.includes(id) || EFFRACTIONS[id].conflicts.includes(active))
+      );
+    }
+    return [];
+  }
+
+  // Each player clicks to draw the card; drawn once everyone has voted
+  handleEffractionVote(socketId) {
+    if (this.state.status !== 'showdown' || !this.state.effractionVoteRequired || this.state.effractionDraw) return;
+    if (this.state.effractionVotes.has(socketId)) return;
+    if (!this.state.players.some(p => p.id === socketId)) return;
+
+    this.state.effractionVotes.add(socketId);
+    const name = this.state.players.find(p => p.id === socketId)?.name;
+    this.io.to(this.roomCode).emit('action_log', `🎲 ${name} est prêt pour la carte Effraction (${this.state.effractionVotes.size}/${this.state.players.length}).`);
+
+    if (this.state.effractionVotes.size === this.state.players.length) {
+      this._drawEffraction();
+    }
+    this.broadcastState();
+  }
+
+  _drawEffraction() {
+    const pool = this.getDrawableEffractions();
+    if (pool.length === 0) return;
+    const id = pool[Math.floor(Math.random() * pool.length)];
+
+    let replaced = null;
+    if (this.effractionMode === 'replace') {
+      replaced = this.state.activeEffractions[0] ?? null;
+      this.state.activeEffractions = [id];
+    } else {
+      this.state.activeEffractions.push(id);
+    }
+
+    this.state.effractionDraw = {
+      card: toPublicEffraction(id),
+      replaced: replaced ? toPublicEffraction(replaced) : null
+    };
+    this.io.to(this.roomCode).emit('action_log',
+      `🃏 Nouvelle carte Effraction : ${EFFRACTIONS[id].name}${replaced ? ` (remplace ${EFFRACTIONS[replaced].name})` : ''}`);
   }
 
   handleNextHeist(socketId) {
     if (this.state.status !== 'showdown') return;
     // Only the host can trigger next heist
     if (socketId !== this.hostId) return;
+    if (this.state.effractionVoteRequired && !this.state.effractionDraw) return; // Card must be drawn first
     const name = this.state.players.find(p => p.id === socketId)?.name || 'Un joueur';
     this.io.to(this.roomCode).emit('action_log', `🔫 ${name} lance le prochain braquage !`);
     this.startNewHeist(false);
@@ -436,12 +728,24 @@ class TheGang {
 
     // Build currentHeistLog from the persisted phaseLog state
     const PHASES_ORDER = ['preflop', 'flop', 'turn', 'river'];
-    const currentHeistLog = Object.entries(this.state.phaseLog || {}).map(([name, phases]) => ({
+    // Panne d'électricité: the history of the current heist stays hidden until the showdown
+    const hideHistory = this.has('power_outage') && ['playing', 'designation'].includes(this.state.status);
+    const currentHeistLog = hideHistory ? [] : Object.entries(this.state.phaseLog || {}).map(([name, phases]) => ({
       name,
       phases: PHASES_ORDER
         .filter(ph => phases[ph] && phases[ph].length > 0)
         .map(ph => ({ phase: ph, tokens: phases[ph] }))
     }));
+
+    const darkTokens = [];
+    for (let i = 1; i <= totalTokens; i++) {
+      if (this.isDarkToken(i)) darkTokens.push(i);
+    }
+    // Dark tokens taken during the current phase (cannot change owner until the next one)
+    const lockedTokens = this.state.players.filter(p => this.isTokenLocked(p)).map(p => p.tokenNumber);
+
+    const d = this.state.designation;
+    const targetName = d ? this.state.players.find(p => p.id === d.targetId)?.name : null;
 
     this.state.players.forEach(player => {
       const opponents = this.state.players
@@ -451,7 +755,9 @@ class TheGang {
           name: p.name,
           tokenNumber: p.tokenNumber,
           hasValidated: this.state.validations.has(p.id),
-          hasPhaseVoted: this.state.phaseVotes.has(p.id)
+          hasPhaseVoted: this.state.phaseVotes.has(p.id),
+          hasEffractionVoted: this.state.effractionVotes.has(p.id),
+          hasDesignationValidated: d ? d.validations.has(p.id) : false
         }));
 
       this.io.to(player.id).emit('update_board_state', {
@@ -475,7 +781,26 @@ class TheGang {
         showdownResult: this.state.showdownResult,
         currentHeistLog,
         tokenHistory: this.state.tokenHistory,
-        oneShotMode: this.oneShotMode
+        oneShotMode: this.oneShotMode,
+        darkTokens,
+        lockedTokens,
+        effractionMode: this.effractionMode,
+        activeEffractions: this.state.activeEffractions.map(toPublicEffraction),
+        effractionVoteRequired: this.state.effractionVoteRequired,
+        effractionVoteCount: this.state.effractionVotes.size,
+        myHasEffractionVoted: this.state.effractionVotes.has(player.id),
+        effractionDraw: this.state.effractionDraw,
+        designation: d ? {
+          targetName,
+          isTarget: d.targetId === player.id,
+          needsRank: d.needsRank,
+          needsHand: d.needsHand,
+          rank: d.rank,
+          hand: d.hand,
+          validationCount: d.validations.size,
+          requiredCount: this.state.players.length - 1,
+          myHasValidated: d.validations.has(player.id)
+        } : null
       });
     });
   }
@@ -485,13 +810,22 @@ class TheGang {
     const player = this.state.players.find(p => p.name === playerName);
     if (!player) return false;
 
-    if (this.state.validations.has(player.id)) {
-      this.state.validations.delete(player.id);
-      this.state.validations.add(newSocketId);
+    const d = this.state.designation;
+    const voteSets = [this.state.validations, this.state.phaseVotes, this.state.effractionVotes];
+    if (d) voteSets.push(d.validations);
+    for (const votes of voteSets) {
+      if (votes.has(player.id)) {
+        votes.delete(player.id);
+        votes.add(newSocketId);
+      }
     }
+    if (d && d.targetId === player.id) d.targetId = newSocketId;
+    if (this.hostId === player.id) this.hostId = newSocketId;
     player.id = newSocketId;
     return true;
   }
 }
+
+TheGang.EFFRACTION_LIST = Object.keys(EFFRACTIONS).map(toPublicEffraction);
 
 module.exports = TheGang;

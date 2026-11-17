@@ -35,6 +35,14 @@ import TraitreLobby from '../views/Traitre/TraitreLobby.vue'
 import TraitreBoard from '../views/Traitre/TraitreBoard.vue'
 import TraitreJoin from '../views/Traitre/TraitreJoin.vue'
 
+import BeloteLobby from '../views/Belote/BeloteLobby.vue'
+import BeloteBoard from '../views/Belote/BeloteBoard.vue'
+import BeloteJoin from '../views/Belote/BeloteJoin.vue'
+
+import TarotLobby from '../views/Tarot/TarotLobby.vue'
+import TarotBoard from '../views/Tarot/TarotBoard.vue'
+import TarotJoin from '../views/Tarot/TarotJoin.vue'
+
 import DutchLobby from '../views/Dutch/DutchLobby.vue'
 import DutchBoard from '../views/Dutch/DutchBoard.vue'
 import DutchJoin from '../views/Dutch/DutchJoin.vue'
@@ -175,6 +183,40 @@ const routes = [
     path: '/traitre/join/:id',
     name: 'TraitreJoin',
     component: TraitreJoin,
+    props: true
+  },
+  {
+    path: '/belote/lobby',
+    name: 'BeloteLobby',
+    component: BeloteLobby
+  },
+  {
+    path: '/belote/:id',
+    name: 'BeloteBoard',
+    component: BeloteBoard,
+    props: true
+  },
+  {
+    path: '/belote/join/:id',
+    name: 'BeloteJoin',
+    component: BeloteJoin,
+    props: true
+  },
+  {
+    path: '/tarot/lobby',
+    name: 'TarotLobby',
+    component: TarotLobby
+  },
+  {
+    path: '/tarot/:id',
+    name: 'TarotBoard',
+    component: TarotBoard,
+    props: true
+  },
+  {
+    path: '/tarot/join/:id',
+    name: 'TarotJoin',
+    component: TarotJoin,
     props: true
   },
   {
