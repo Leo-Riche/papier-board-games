@@ -1,46 +1,42 @@
 <template>
   <div class="lobby-wrapper">
     <header class="lobby-header">
-      <h1 class="game-title">DUTCH</h1>
-      <p class="subtitle">Mémoire, bluff et réflexes · 2 à 8 joueurs</p>
+      <h1 class="game-title">Dutch 🃏</h1>
+      <p class="subtitle">Mémoire, bluff et réflexes · 52 cartes · de 2 à 8 joueurs</p>
     </header>
 
     <main class="lobby-main">
-      <div class="deck">
+      <div class="desk">
         <div class="setup-form">
-          <h2>Créer un salon</h2>
-          <div class="du-input-group">
-            <input type="text" v-model="playerName" placeholder="Votre Pseudo" />
+          <h2>Créer une table</h2>
+          <div class="input-group">
+            <input type="text" v-model="playerName" placeholder="Votre pseudo" @keyup.enter="createRoom" />
           </div>
-          <BaseButton variant="primary" @click="createRoom">Ouvrir une table 🃏</BaseButton>
+          <button class="action-btn primary" @click="createRoom">Créer la partie</button>
         </div>
 
-        <div class="separator"></div>
+        <div class="divider"></div>
 
         <div class="setup-form">
-          <h2>Rejoindre un salon</h2>
-          <div class="du-input-group">
-            <input type="text" v-model="playerName" placeholder="Votre Pseudo" />
+          <h2>Rejoindre une table</h2>
+          <div class="input-group">
+            <input type="text" v-model="playerName" placeholder="Votre pseudo" />
           </div>
-          <div class="du-input-group">
-            <input type="text" v-model="roomCode" placeholder="Code (ex: A4X9P)" />
+          <div class="input-group">
+            <input type="text" v-model="roomCode" placeholder="Code (ex: A4X9P)" @keyup.enter="joinRoom" />
           </div>
-          <BaseButton variant="secondary" @click="joinRoom">S'asseoir</BaseButton>
+          <button class="action-btn secondary" @click="joinRoom">Rejoindre</button>
         </div>
       </div>
 
-      <section class="rules">
-        <h3>Règles en bref</h3>
-        <ul>
-          <li>4 cartes face cachée, tu en regardes 2 au début. Objectif : le <strong>moins de points</strong>.</li>
-          <li>As = 1 · 2 à 10 = valeur · Valet = 11 · Dame = 12 · <strong>Roi rouge = 0</strong> · Roi noir = 13.</li>
-          <li>À ton tour : pioche, puis échange avec une de tes cartes <strong>ou</strong> défausse-la directement.</li>
-          <li>Défausser directement un <strong>Valet</strong> : échange 2 cartes au choix. Une <strong>Dame</strong> : regarde une carte au choix.</li>
-          <li><strong>Snap</strong> (5 s) : après chaque défausse, pose une carte de même valeur. Erreur = carte de pénalité.</li>
-          <li><strong>Dutch</strong> : annonce-le en fin de tour ; les autres jouent un dernier tour, puis on révèle.</li>
-          <li>Égalité : le moins de cartes gagne ; égalité parfaite : l'annonceur perd.</li>
-        </ul>
-      </section>
+      <div class="rules-box">
+        <h3>📜 En bref</h3>
+        <p><strong>4 cartes face cachée</strong> chacun : tu en regardes 2 au début, puis il faut s'en souvenir. Objectif : avoir le <strong>moins de points</strong>.</p>
+        <p>As = 1 · 2 à 10 = valeur · Valet = 11 · Dame = 12 · <strong>Roi rouge = 0</strong> · Roi noir = 13.</p>
+        <p><strong>À ton tour</strong> : pioche, puis échange la carte avec une des tiennes <strong>ou</strong> défausse-la. Défausser un <strong>Valet</strong> : échange 2 cartes au choix. Une <strong>Dame</strong> : regarde une carte au choix.</p>
+        <p><strong>Snap</strong> : à tout moment, pose une carte de même valeur que le dessus de la défausse. Erreur = carte de pénalité.</p>
+        <p><strong>Dutch</strong> : annonce-le juste après avoir pioché ; les autres jouent un dernier tour. Égalité : le moins de cartes gagne, puis l'annonceur perd. Une partie = une manche.</p>
+      </div>
     </main>
   </div>
 </template>
@@ -48,19 +44,15 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import BaseButton from '@/components/BaseButton.vue'
 
 const router = useRouter()
-
 const playerName = ref(localStorage.getItem('temp_player_name') || '')
 const roomCode = ref('')
 
 const generateRoomCode = (length = 5) => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let result = ''
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length))
-  }
+  for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length))
   return result
 }
 
@@ -71,56 +63,55 @@ const createRoom = () => {
 }
 
 const joinRoom = () => {
-  if (!playerName.value.trim() || !roomCode.value.trim()) return alert('Pseudo et Code requis !')
+  if (!playerName.value.trim() || !roomCode.value.trim()) return alert('Pseudo et code requis !')
   localStorage.setItem('temp_player_name', playerName.value.trim())
   router.push(`/dutch/game/${roomCode.value.trim().toUpperCase()}`)
 }
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Space+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
 
-.lobby-wrapper {
-  min-height: 100vh; display: flex; flex-direction: column;
-  background: radial-gradient(circle at 50% 0%, #1e6b4c 0%, #0b2e21 75%);
-  color: #f1e3c0; font-family: 'Space Mono', monospace;
-}
-.lobby-header { text-align: center; padding: 50px 20px 20px; }
-.game-title { font-family: 'Playfair Display', serif; font-size: 3.4rem; color: #f1c40f; letter-spacing: 8px; margin: 0; }
-.subtitle { color: #a8d5ba; letter-spacing: 2px; text-transform: uppercase; margin-top: 12px; font-size: 0.85rem; }
+.lobby-wrapper { min-height: 100vh; display: flex; flex-direction: column; background: #0b1424; color: #e8eef7; font-family: 'Outfit', sans-serif; box-sizing: border-box; }
+.lobby-header { padding: 40px 20px; text-align: center; background: linear-gradient(180deg, #13223a 0%, #0b1424 100%); border-bottom: 1px solid rgba(255,154,60,0.22); margin-bottom: 40px; }
+.game-title { font-size: 3.5rem; font-weight: 900; margin: 0; color: #ff9a3c; filter: drop-shadow(0 2px 8px rgba(255,154,60,0.35)); }
+.subtitle { color: #5f7899; font-size: 1.05rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-top: 10px; }
 
-.lobby-main { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 30px; padding: 20px; }
-.deck {
-  display: flex; align-items: stretch; gap: 40px; padding: 40px;
-  border: 1px solid rgba(241, 196, 15, 0.25); border-radius: 16px; background: rgba(6, 30, 21, 0.55);
-}
-.separator { width: 1px; background: rgba(241, 196, 15, 0.2); }
+.lobby-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; gap: 30px; }
+.desk { display: flex; align-items: stretch; background: #13223a; padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 1px solid rgba(255,154,60,0.2); box-sizing: border-box; }
+.divider { width: 1px; background: rgba(255,154,60,0.15); margin: 0 40px; }
+
 .setup-form { display: flex; flex-direction: column; align-items: center; gap: 24px; min-width: 260px; }
-.setup-form h2 {
-  font-family: 'Playfair Display', serif; color: #f1e3c0; font-size: 1.4rem; font-weight: normal;
-  border-bottom: 1px solid #f1c40f; padding-bottom: 10px; width: 100%; text-align: center; margin: 0;
-}
-.du-input-group { width: 100%; }
-.du-input-group input {
-  width: 100%; padding: 12px; background: rgba(3, 20, 14, 0.6); border: 1px solid rgba(241, 196, 15, 0.3);
-  border-radius: 8px; color: #f1e3c0; font-family: 'Space Mono', monospace; font-size: 1rem;
-  text-align: center; outline: none; transition: border-color 0.2s; box-sizing: border-box;
-}
-.du-input-group input::placeholder { color: #5f8a74; }
-.du-input-group input:focus { border-color: #f1c40f; }
+.setup-form h2 { color: #ff9a3c; font-size: 1.6rem; font-weight: 700; text-align: center; margin: 0; }
 
-.rules {
-  max-width: 640px; width: 100%; box-sizing: border-box; padding: 20px 26px;
-  border: 1px dashed rgba(241, 227, 192, 0.25); border-radius: 12px; background: rgba(6, 30, 21, 0.4);
+.input-group { width: 100%; }
+.input-group input {
+  width: 100%; padding: 14px; background: #0b1424; border: 2px solid transparent; border-radius: 10px;
+  color: #e8eef7; font-family: 'Outfit', sans-serif; font-size: 1.05rem; text-align: center;
+  outline: none; transition: 0.3s; box-sizing: border-box;
 }
-.rules h3 { margin: 0 0 12px; font-family: 'Playfair Display', serif; color: #f1c40f; font-weight: normal; }
-.rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem; line-height: 1.5; color: #d6e8dc; }
-.rules strong { color: #f1e3c0; }
+.input-group input::placeholder { color: #3a5072; }
+.input-group input:focus { border-color: #ff9a3c; background: #13223a; }
+
+.action-btn {
+  width: 100%; border: none; border-radius: 10px;
+  font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; padding: 14px;
+  cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; box-sizing: border-box;
+}
+.action-btn.primary { background: linear-gradient(135deg, #f07c22, #c95a12); color: #fff7ee; }
+.action-btn.primary:hover { background: linear-gradient(135deg, #ff8f3a, #db6618); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(240,124,34,0.4); }
+.action-btn.secondary { background: #0b1424; color: #a9bfdc; border: 2px solid #2a3f5f; }
+.action-btn.secondary:hover { background: #13223a; color: #e8eef7; border-color: #ff9a3c; transform: translateY(-2px); }
+
+.rules-box { background: #13223a; border: 1px solid rgba(255,154,60,0.15); border-radius: 14px; padding: 24px 30px; max-width: 640px; width: 100%; box-sizing: border-box; }
+.rules-box h3 { color: #ff9a3c; margin: 0 0 14px 0; font-size: 1.1rem; }
+.rules-box p { color: #a9bfdc; font-size: 0.9rem; margin: 0 0 8px 0; line-height: 1.6; }
+.rules-box p strong { color: #ffd2a6; }
 
 @media (max-width: 768px) {
-  .game-title { font-size: 2.4rem; }
-  .deck { flex-direction: column; gap: 24px; padding: 24px; width: 100%; max-width: 400px; box-sizing: border-box; }
-  .separator { width: 100%; height: 1px; }
-  .setup-form { min-width: 100%; }
+  .game-title { font-size: 2.5rem; }
+  .desk { flex-direction: column; padding: 24px; gap: 30px; width: 100%; }
+  .divider { width: 100%; height: 1px; margin: 0; }
+  .setup-form { min-width: 0; width: 100%; }
 }
 </style>

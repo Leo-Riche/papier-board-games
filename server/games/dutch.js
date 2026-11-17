@@ -6,11 +6,12 @@
 //
 // Déroulement d'un tour :
 //   1. le joueur pioche une carte ;
-//   2. il l'échange avec une de ses cartes OU la défausse directement
-//      (défausser directement un Valet / une Dame déclenche son pouvoir) ;
-//   3. une fenêtre de « snap » s'ouvre : tout le monde peut défausser une carte
-//      de même valeur que la défausse (erreur = carte de pénalité) ;
-//   4. pendant cette fenêtre, le joueur actif peut annoncer « Dutch ».
+//   2. juste après avoir pioché, il peut annoncer « Dutch » ;
+//   3. il échange la carte piochée avec une de ses cartes OU la défausse
+//      directement (défausser directement un Valet / une Dame déclenche son
+//      pouvoir) ; le tour passe aussitôt au joueur suivant.
+// Snap : à tout moment de la partie, n'importe qui peut défausser une carte de
+// même valeur que le dessus de la défausse (erreur = carte de pénalité).
 // Après une annonce, chaque autre joueur joue un dernier tour, puis on révèle.
 
 const shuffle = (array) => {
@@ -28,7 +29,6 @@ const RANK_LABELS = { A: 'As', J: 'Valet', Q: 'Dame', K: 'Roi' };
 
 const HAND_SIZE = 4;
 const INITIAL_PEEKS = 2;
-const SNAP_WINDOW_MS = 5000;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 8;
 
@@ -48,11 +48,10 @@ class Dutch {
     this.io = io;
     this.players = playersData; // [{ id, name }]
     this.wins = { ...previousWins }; // { [name]: nombre de manches gagnées }
-    this.snapTimer = null;
 
     this.state = {
       status: 'playing',     // 'playing' | 'finished'
-      phase: 'peek',         // 'peek' | 'draw' | 'decide' | 'power' | 'snap' | 'reveal'
+      phase: 'peek',         // 'peek' | 'draw' | 'decide' | 'power' | 'reveal'
       deck: [],
       discard: [],
       players: [],           // [{ id, name, hand: (card|null)[], peeked: number[], ready }]
@@ -60,7 +59,6 @@ class Dutch {
       drawnCard: null,
       pendingPower: null,    // { type: 'jack' | 'queen' | 'queen_seen' }
       peekResult: null,      // { playerIndex, slot } — carte regardée avec la Dame
-      snapDeadline: null,
       dutchIndex: null,      // index du joueur ayant annoncé Dutch
       results: null,
     };
@@ -102,9 +100,8 @@ class Dutch {
     this.broadcastState();
   }
 
-  destroy() {
-    this.clearSnapTimer();
-  }
+  // Conservé pour index.js : plus aucun minuteur à nettoyer.
+  destroy() {}
 
   // ── Utilitaires ────────────────────────────────────────────────
   log(message) {
@@ -145,11 +142,6 @@ class Dutch {
     return { playerIndex, slot };
   }
 
-  clearSnapTimer() {
-    if (this.snapTimer) clearTimeout(this.snapTimer);
-    this.snapTimer = null;
-  }
-
   // ── Point d'entrée des actions ─────────────────────────────────
   handleAction(socketId, actionType, payload = {}) {
     if (this.state.status !== 'playing') return;
@@ -162,20 +154,20 @@ class Dutch {
     switch (actionType) {
       case 'peek_initial': if (phase === 'peek') this.peekInitial(playerIndex, payload.slot); return;
       case 'ready':        if (phase === 'peek') this.setReady(playerIndex); return;
-      case 'snap':         if (phase === 'snap') this.snap(playerIndex, payload.slot); return;
+      case 'snap':         if (phase !== 'peek') this.snap(playerIndex, payload.slot); return;
     }
 
     if (!isCurrent) return;
 
     switch (actionType) {
       case 'draw':          if (phase === 'draw') this.draw(); return;
+      case 'dutch':         if (phase === 'decide') this.declareDutch(); return;
       case 'swap':          if (phase === 'decide') this.swapDrawn(payload.slot); return;
       case 'discard_drawn': if (phase === 'decide') this.discardDrawn(); return;
       case 'jack_swap':     if (phase === 'power') this.jackSwap(payload.a, payload.b); return;
       case 'queen_peek':    if (phase === 'power') this.queenPeek(payload.target); return;
       case 'ack_peek':      if (phase === 'power') this.ackPeek(); return;
       case 'skip_power':    if (phase === 'power') this.skipPower(); return;
-      case 'dutch':         if (phase === 'snap') this.declareDutch(); return;
     }
   }
 
@@ -221,7 +213,7 @@ class Dutch {
     this.state.drawnCard = null;
     this.state.discard.push(old);
     this.log(`🔁 ${player.name} échange une de ses cartes et défausse ${cardLabel(old)}.`);
-    this.openSnapWindow();
+    this.endTurn();
   }
 
   discardDrawn() {
@@ -240,7 +232,7 @@ class Dutch {
     }
 
     this.log(`🗑️ ${player.name} défausse directement ${cardLabel(card)}.`);
-    this.openSnapWindow();
+    this.endTurn();
   }
 
   // ── Pouvoirs ───────────────────────────────────────────────────
@@ -258,7 +250,7 @@ class Dutch {
     const who = (p, slot) => `la carte n°${slot + 1} de ${p.name}`;
     this.log(`🔄 Valet : ${this.currentPlayer().name} échange ${who(pa, ta.slot)} avec ${who(pb, tb.slot)}.`);
     this.state.pendingPower = null;
-    this.openSnapWindow();
+    this.endTurn();
   }
 
   queenPeek(target) {
@@ -277,25 +269,17 @@ class Dutch {
     if (!this.state.pendingPower || this.state.pendingPower.type !== 'queen_seen') return;
     this.state.peekResult = null;
     this.state.pendingPower = null;
-    this.openSnapWindow();
+    this.endTurn();
   }
 
   skipPower() {
     if (!this.state.pendingPower || this.state.pendingPower.type === 'queen_seen') return;
     this.log(`⏭️ ${this.currentPlayer().name} n'utilise pas le pouvoir.`);
     this.state.pendingPower = null;
-    this.openSnapWindow();
+    this.endTurn();
   }
 
-  // ── Snap ───────────────────────────────────────────────────────
-  openSnapWindow() {
-    this.clearSnapTimer();
-    this.state.phase = 'snap';
-    this.state.snapDeadline = Date.now() + SNAP_WINDOW_MS;
-    this.snapTimer = setTimeout(() => this.endTurn(), SNAP_WINDOW_MS);
-    this.broadcastState();
-  }
-
+  // ── Snap (possible à tout moment, hors découverte) ─────────────
   snap(playerIndex, slot) {
     const player = this.state.players[playerIndex];
     slot = Number(slot);
@@ -325,9 +309,7 @@ class Dutch {
   }
 
   endTurn() {
-    this.clearSnapTimer();
     if (this.state.status !== 'playing') return;
-    this.state.snapDeadline = null;
 
     const nb = this.state.players.length;
     this.state.currentPlayerIndex = (this.state.currentPlayerIndex + 1) % nb;
@@ -342,7 +324,6 @@ class Dutch {
   }
 
   revealRound() {
-    this.clearSnapTimer();
     const { dutchIndex } = this.state;
 
     const scored = this.state.players.map((p, index) => {
@@ -423,7 +404,6 @@ class Dutch {
     const { players, currentPlayerIndex, dutchIndex, phase, status } = this.state;
     const current = this.currentPlayer();
     const top = this.topDiscard();
-    const snapRemainingMs = this.state.snapDeadline ? Math.max(0, this.state.snapDeadline - Date.now()) : 0;
     const powerType = this.state.pendingPower ? this.state.pendingPower.type : null;
 
     players.forEach((viewer, viewerIndex) => {
@@ -458,8 +438,7 @@ class Dutch {
         drawnCard: isMyTurn ? this.state.drawnCard : null,
         powerType,
         peekTarget: isMyTurn && peek ? { playerId: players[peek.playerIndex].id, slot: peek.slot } : null,
-        snapRemainingMs,
-        snapWindowMs: SNAP_WINDOW_MS,
+        canSnap: status === 'playing' && phase !== 'peek' && !!top,
         dutchPlayerName: dutchIndex !== null ? players[dutchIndex].name : null,
         players: publicPlayers,
         results: this.state.results,
