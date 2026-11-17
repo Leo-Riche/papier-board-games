@@ -30,7 +30,7 @@
           <h3>Rappel des règles</h3>
           <ul class="rules-list">
             <li>Regarde 2 de tes 4 cartes, puis mémorise-les.</li>
-            <li>Pioche, puis échange ou défausse. Valet : échange 2 cartes · Dame : regarde 1 carte.</li>
+            <li>Pioche, puis échange ou défausse. Si un Valet part à la défausse : échange 2 cartes · une Dame : regarde 1 carte.</li>
             <li>Snap à tout moment sur la défausse (erreur = pénalité).</li>
             <li>Dutch : juste après avoir pioché. Le plus petit total gagne la manche.</li>
           </ul>
@@ -118,6 +118,10 @@
             <DutchCard :card="state.drawnCard" class="pile-card" :class="{ mine: state.isMyTurn }" />
             <span class="pile-label">{{ state.isMyTurn ? 'Ta carte' : `Carte de ${state.currentPlayerName}` }}</span>
           </div>
+          <div v-if="peekedCard" class="pile drawn">
+            <DutchCard :card="peekedCard.card" class="pile-card peek-card" />
+            <span class="pile-label">{{ peekedCard.label }}</span>
+          </div>
         </div>
 
         <!-- À qui de jouer (+ actions) -->
@@ -156,7 +160,8 @@
               v-if="s"
               class="hand-card"
               :class="{
-                playable: myCardAction(s) && myCardAction(s) !== 'snap',
+                playable: myCardAction(s) === 'peek' || myCardAction(s) === 'swap',
+                target: myCardAction(s) === 'target',
                 snappable: myCardAction(s) === 'snap',
                 selected: isSelected(me.id, s.slot),
                 peeked: isPeekTarget(me.id, s.slot) || (state.phase === 'peek' && s.card),
@@ -354,7 +359,20 @@ const snapOpen = computed(() => !!state.value?.canSnap && !busyWithTurn.value)
 
 // ── Cibles du Valet / de la Dame ─────────────────────────────────
 const jackSelection = ref([])
-watch(() => [state.value?.phase, state.value?.powerType, state.value?.currentPlayerId], () => { jackSelection.value = [] })
+// Clé texte : la sélection n'est remise à zéro que si la phase / le pouvoir / le joueur change,
+// pas à chaque diffusion d'état (ex. : un adversaire qui snappe pendant qu'on choisit).
+watch(() => `${state.value?.phase}|${state.value?.powerType}|${state.value?.currentPlayerId}`, () => { jackSelection.value = [] })
+
+// Carte regardée avec la Dame : affichée en grand au centre de la table.
+const peekedCard = computed(() => {
+  const t = state.value?.peekTarget
+  if (!t) return null
+  const owner = state.value.players.find(p => p.id === t.playerId)
+  const card = owner?.slots[t.slot]?.card
+  if (!card) return null
+  const whose = owner.id === state.value.myId ? 'Ta carte' : `Carte de ${owner.name}`
+  return { card, label: `${whose} n°${t.slot + 1}` }
+})
 
 const choosingTarget = computed(() =>
   state.value?.phase === 'power' && state.value?.isMyTurn
@@ -433,7 +451,7 @@ const feltText = computed(() => {
       if (!st.isMyTurn) return `${name} utilise ${st.powerType === 'jack' ? 'le Valet' : 'la Dame'}…`
       if (st.powerType === 'jack') return `Valet : choisis 2 cartes à échanger (${jackSelection.value.length}/2)`
       if (st.powerType === 'queen') return 'Dame : choisis une carte à regarder'
-      return 'Voici la carte : mémorise-la !'
+      return 'Voici la carte (au centre) : mémorise-la !'
     default:
       return ''
   }
@@ -537,9 +555,16 @@ const hasActions = computed(() => {
 .seat-cards { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; justify-content: center; max-width: 280px; }
 .mini-card { width: 46px; height: 66px; }
 .slot { border-radius: 6px; transition: transform 0.12s ease, box-shadow 0.12s ease; }
-.slot.target { cursor: pointer; box-shadow: 0 0 0 2px rgba(255,210,138,0.55); }
-.slot.target:hover { transform: translateY(-4px); box-shadow: 0 0 0 2px #ffd28a; }
-.slot.selected { transform: translateY(-4px); box-shadow: 0 0 0 3px #ff9a3c, 0 0 16px rgba(255,154,60,0.6); }
+/* cibles d'un pouvoir (Valet / Dame) : anneau qui pulse pour bien montrer qu'il faut cliquer */
+.slot.target, .hand-card.target { cursor: pointer; animation: targetPulse 1.2s ease-in-out infinite; }
+.slot.target:hover { transform: translateY(-4px); animation: none; box-shadow: 0 0 0 3px #ffd28a, 0 0 18px rgba(255,210,138,0.7); }
+.hand-card.target:hover { transform: translateY(-12px); animation: none; box-shadow: 0 0 0 3px #ffd28a, 0 0 18px rgba(255,210,138,0.7); }
+@keyframes targetPulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(255,210,138,0.55), 0 0 6px rgba(255,210,138,0.2); }
+  50%     { box-shadow: 0 0 0 3px rgba(255,210,138,1),    0 0 18px rgba(255,210,138,0.65); }
+}
+@media (prefers-reduced-motion: reduce) { .slot.target, .hand-card.target { animation: none; box-shadow: 0 0 0 3px #ffd28a; } }
+.slot.selected, .slot.target.selected { transform: translateY(-4px); animation: none; box-shadow: 0 0 0 3px #ff9a3c, 0 0 16px rgba(255,154,60,0.6); }
 .slot.peeked { box-shadow: 0 0 0 3px #5fe0a0, 0 0 16px rgba(95,224,160,0.55); }
 .slot-empty { border: 1.5px dashed rgba(169,195,230,0.3); border-radius: 6px; flex-shrink: 0; }
 .slot-empty.mini { width: 46px; height: 66px; }
@@ -565,6 +590,7 @@ const hasActions = computed(() => {
 }
 .pile.drawn { padding-left: 22px; border-left: 1px dashed rgba(169,195,230,0.3); }
 .pile-card.mine { box-shadow: 0 0 0 3px #ffd28a, 0 0 22px rgba(255,210,138,0.5); }
+.pile-card.peek-card { box-shadow: 0 0 0 3px #5fe0a0, 0 0 22px rgba(95,224,160,0.55); animation: discardIn 0.3s cubic-bezier(0.2,0.75,0.3,1); }
 .discard-in { animation: discardIn 0.3s cubic-bezier(0.2,0.75,0.3,1); }
 @keyframes pilePulse {
   0%,100% { box-shadow: 0 0 0 3px rgba(255,210,138,0.75), 0 0 16px rgba(255,210,138,0.35); }
@@ -620,7 +646,7 @@ const hasActions = computed(() => {
   content: '⚡ Snap'; position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
   font-size: 0.72rem; font-weight: 800; color: #ffb366; white-space: nowrap;
 }
-.hand-card.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px #ff9a3c, 0 0 18px rgba(255,154,60,0.6); }
+.hand-card.selected, .hand-card.target.selected { transform: translateY(-14px); animation: none; box-shadow: 0 0 0 3px #ff9a3c, 0 0 18px rgba(255,154,60,0.6); }
 .hand-card.peeked { box-shadow: 0 0 0 3px #5fe0a0, 0 0 18px rgba(95,224,160,0.55); }
 .hand-empty { width: 104px; height: 152px; border-radius: 7px; }
 @media (prefers-reduced-motion: reduce) { .hand-card, .slot { transform: none !important; } }

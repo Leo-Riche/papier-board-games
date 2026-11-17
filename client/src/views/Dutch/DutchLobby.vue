@@ -33,7 +33,7 @@
         <h3>📜 En bref</h3>
         <p><strong>4 cartes face cachée</strong> chacun : tu en regardes 2 au début, puis il faut s'en souvenir. Objectif : avoir le <strong>moins de points</strong>.</p>
         <p>As = 1 · 2 à 10 = valeur · Valet = 11 · Dame = 12 · <strong>Roi rouge = 0</strong> · Roi noir = 13.</p>
-        <p><strong>À ton tour</strong> : pioche, puis échange la carte avec une des tiennes <strong>ou</strong> défausse-la. Défausser un <strong>Valet</strong> : échange 2 cartes au choix. Une <strong>Dame</strong> : regarde une carte au choix.</p>
+        <p><strong>À ton tour</strong> : pioche, puis échange la carte avec une des tiennes <strong>ou</strong> défausse-la. Si la carte qui part à la défausse est un <strong>Valet</strong> : échange 2 cartes au choix. Une <strong>Dame</strong> : regarde une carte au choix.</p>
         <p><strong>Snap</strong> : à tout moment, pose une carte de même valeur que le dessus de la défausse. Erreur = carte de pénalité.</p>
         <p><strong>Dutch</strong> : annonce-le juste après avoir pioché ; les autres jouent un dernier tour. Égalité : le moins de cartes gagne, puis l'annonceur perd. Une partie = une manche.</p>
       </div>

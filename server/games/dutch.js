@@ -8,8 +8,8 @@
 //   1. le joueur pioche une carte ;
 //   2. juste après avoir pioché, il peut annoncer « Dutch » ;
 //   3. il échange la carte piochée avec une de ses cartes OU la défausse
-//      directement (défausser directement un Valet / une Dame déclenche son
-//      pouvoir) ; le tour passe aussitôt au joueur suivant.
+//      directement ; si la carte qui part à la défausse est un Valet ou une
+//      Dame, son pouvoir se déclenche ; puis le tour passe au joueur suivant.
 // Snap : à tout moment de la partie, n'importe qui peut défausser une carte de
 // même valeur que le dessus de la défausse (erreur = carte de pénalité).
 // Après une annonce, chaque autre joueur joue un dernier tour, puis on révèle.
@@ -211,27 +211,31 @@ class Dutch {
     const old = player.hand[slot];
     player.hand[slot] = this.state.drawnCard;
     this.state.drawnCard = null;
-    this.state.discard.push(old);
-    this.log(`🔁 ${player.name} échange une de ses cartes et défausse ${cardLabel(old)}.`);
-    this.endTurn();
+    this.discardOnTurn(player, old, `🔁 ${player.name} échange une de ses cartes et défausse ${cardLabel(old)}`);
   }
 
   discardDrawn() {
     const player = this.currentPlayer();
     const card = this.state.drawnCard;
     this.state.drawnCard = null;
+    this.discardOnTurn(player, card, `🗑️ ${player.name} défausse directement ${cardLabel(card)}`);
+  }
+
+  // Carte défaussée par le joueur actif pendant son tour (piochée ou sortie de sa main) :
+  // un Valet ou une Dame déclenche son pouvoir, sinon le tour passe.
+  discardOnTurn(player, card, message) {
     this.state.discard.push(card);
 
     if (card.rank === 'J' || card.rank === 'Q') {
       this.state.pendingPower = { type: card.rank === 'J' ? 'jack' : 'queen' };
       this.state.phase = 'power';
       const power = card.rank === 'J' ? 'peut échanger 2 cartes' : 'peut regarder une carte';
-      this.log(`🗑️ ${player.name} défausse ${cardLabel(card)} et ${power}.`);
+      this.log(`${message} et ${power} !`);
       this.broadcastState();
       return;
     }
 
-    this.log(`🗑️ ${player.name} défausse directement ${cardLabel(card)}.`);
+    this.log(`${message}.`);
     this.endTurn();
   }
 
