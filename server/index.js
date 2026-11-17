@@ -11,6 +11,7 @@ const TheGang = require('./games/thegang');
 const Charger = require('./games/charger');
 const SkullKing = require('./games/skullking');
 const Traitre = require('./games/traitre');
+const Dutch = require('./games/dutch');
 
 const app = express();
 
@@ -333,6 +334,42 @@ io.on('connection', (socket) => {
     const cleanRoomCode = roomCode.trim();
     const game = activeGames[cleanRoomCode];
     if (game && game instanceof Traitre) {
+      game.handleAction(socket.id, actionType, payload || {});
+    }
+  });
+
+  // ── DUTCH ───────────────────────────────────────────────────
+  socket.on('start_dutch', (roomCode) => {
+    const cleanRoomCode = (typeof roomCode === 'string' ? roomCode : '').trim();
+    const clients = Array.from(io.sockets.adapter.rooms.get(cleanRoomCode) || []);
+
+    if (clients[0] !== socket.id) {
+      return console.log(`🚫 Lancement non autorisé par ${socket.id}`);
+    }
+
+    if (clients.length < 2 || clients.length > 8) {
+      return socket.emit('dutch_error', `Dutch se joue de 2 à 8 joueurs (actuellement : ${clients.length}).`);
+    }
+
+    const playersData = clients.map(id => {
+      const s = io.sockets.sockets.get(id);
+      return { id, name: s.playerName || 'Anonyme' };
+    });
+
+    // Nouvelle manche : on conserve le compteur de manches gagnées du salon.
+    const previous = activeGames[cleanRoomCode] instanceof Dutch ? activeGames[cleanRoomCode] : null;
+    if (previous) previous.destroy();
+
+    const game = new Dutch(cleanRoomCode, playersData, io, previous ? previous.wins : {});
+    activeGames[cleanRoomCode] = game;
+    game.start();
+  });
+
+  socket.on('dutch_action', (data) => {
+    const { roomCode, actionType, payload } = data || {};
+    if (typeof roomCode !== 'string') return;
+    const game = activeGames[roomCode.trim()];
+    if (game && game instanceof Dutch) {
       game.handleAction(socket.id, actionType, payload || {});
     }
   });

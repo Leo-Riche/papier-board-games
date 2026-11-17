@@ -35,6 +35,10 @@ import TraitreLobby from '../views/Traitre/TraitreLobby.vue'
 import TraitreBoard from '../views/Traitre/TraitreBoard.vue'
 import TraitreJoin from '../views/Traitre/TraitreJoin.vue'
 
+import DutchLobby from '../views/Dutch/DutchLobby.vue'
+import DutchBoard from '../views/Dutch/DutchBoard.vue'
+import DutchJoin from '../views/Dutch/DutchJoin.vue'
+
 const routes = [
   {
     path: '/',
@@ -171,6 +175,22 @@ const routes = [
     path: '/traitre/join/:id',
     name: 'TraitreJoin',
     component: TraitreJoin,
+    props: true
+  },
+  {
+    path: '/dutch/lobby',
+    name: 'DutchLobby',
+    component: DutchLobby
+  },
+  {
+    path: '/dutch/game/:id',
+    name: 'DutchBoard',
+    component: DutchBoard
+  },
+  {
+    path: '/dutch/join/:id',
+    name: 'DutchJoin',
+    component: DutchJoin,
     props: true
   },
 ]

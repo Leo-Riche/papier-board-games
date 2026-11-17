@@ -50,6 +50,13 @@
         <p>Des Mutins se cachent parmi l'équipage. Remplissez le Coffre... ou sabotez la collecte et semez la mutinerie !</p>
         <button class="btn-play">Jouer maintenant</button>
       </div>
+
+      <div class="game-card" @click="$router.push('/dutch/lobby')">
+        <div class="badge">Nouveau !</div>
+        <h2>Dutch 🃏</h2>
+        <p>Mémorisez vos cartes, snappez au bon moment et annoncez « Dutch » avec le plus petit total !</p>
+        <button class="btn-play">Jouer maintenant</button>
+      </div>
     </div>
   </div>
 </template>
