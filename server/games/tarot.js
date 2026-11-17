@@ -12,6 +12,7 @@ const SUIT_ORDER = Object.fromEntries(SUIT_RANKS.map((r, i) => [r, i])); // forc
 
 const TRICK_PAUSE_MS = 3000;   // délai avant de ramasser un pli complet
 const REVIEW_MAX_MS = 30000;   // relâche un joueur qui "regarde le dernier pli" au bout de 30 s
+const REDEAL_PAUSE_MS = 1900;  // temps laissé aux clients pour jouer l'animation de redonne
 
 // Contrats (enchères) par ordre croissant + multiplicateur de marque
 const CONTRACTS = ['petite', 'garde', 'garde_sans', 'garde_contre'];
@@ -122,12 +123,22 @@ class Tarot {
     this.history = [];
     this.dealerSeat = Math.floor(Math.random() * this.N);
     this.handNumber = 0;
+    this.dealId = 0; // incrémenté à chaque distribution, redonnes comprises
     this._reviewers = new Map();
     this.state = { status: 'waiting' };
   }
 
-  _next(seat) { return (seat + 1) % this.N; }
+  // Le jeu tourne dans le sens antihoraire (comme sur un vrai tapis) :
+  // le joueur suivant est celui assis au siège précédent.
+  _next(seat) { return (seat - 1 + this.N) % this.N; }
   _allSeats() { return Array.from({ length: this.N }, (_, i) => i); }
+  // Ordre de parole / de distribution à partir d'un siège, dans le sens du jeu.
+  _orderFrom(start) {
+    const out = [];
+    let seat = start;
+    for (let i = 0; i < this.N; i++) { out.push(seat); seat = this._next(seat); }
+    return out;
+  }
 
   // ---------- utilitaires ----------
   seatOf(id) { const p = this.players.find((p) => p.id === id); return p ? p.seat : -1; }
@@ -146,6 +157,7 @@ class Tarot {
     this._clearReviewers();
     if (this.handNumber > 0) this.dealerSeat = this._next(this.dealerSeat);
     if (!sameNumber) this.handNumber++;
+    this.dealId++;
 
     this.state = {
       status: 'bidding',
@@ -154,6 +166,7 @@ class Tarot {
       chien: [],
       turnSeat: this._next(this.dealerSeat),
       bids: new Array(this.N).fill(null),
+      passed: new Array(this.N).fill(false),
       bidsCount: 0,
       takerSeat: null,
       contract: null,
@@ -162,6 +175,7 @@ class Tarot {
       ecart: [],
       slam: null,
       poignees: [],
+      redealing: false,
       // Appel du Roi (à 5 joueurs)
       calledCard: null,
       partnerSeat: null,
@@ -192,7 +206,7 @@ class Tarot {
     const { hand: handSize, chien: chienSize, packet } = this.deal;
     const hands = Array.from({ length: this.N }, () => []);
     const chien = [];
-    const seq = this._allSeats().map((k) => (this.dealerSeat + 1 + k) % this.N);
+    const seq = this._orderFrom(this._next(this.dealerSeat));
     const totalPackets = (this.N * handSize) / packet;
     // Répartir les cartes du Chien entre les paquets (jamais au 1er ni au dernier).
     const chienAfter = new Set();
@@ -216,7 +230,7 @@ class Tarot {
       const hasExcuse = h.some(isExcuse);
       if (!hasExcuse && trumps.length === 1 && trumps[0].value === '01') {
         this.log(`♻️ Petit sec chez ${this.nameOf(seat)} — donne annulée, on redonne.`);
-        setTimeout(() => this._beginHand(true), 300);
+        this._announceRedeal('petit_sec', this.nameOf(seat));
         return;
       }
     }
@@ -227,6 +241,8 @@ class Tarot {
     const seat = this.seatOf(playerId);
     if (seat === -1) return;
     const s = this.state;
+
+    if (s.redealing) return;
 
     if (type === 'bid' && s.status === 'bidding' && seat === s.turnSeat) {
       return this._handleBid(seat, payload.contract);
@@ -252,7 +268,7 @@ class Tarot {
     }
 
     if (type === 'declare_poignee' && s.status === 'playing') {
-      return this._handlePoignee(seat, payload.kind);
+      return this._handlePoignee(seat, payload.kind, payload.cardIds);
     }
     if (type === 'skip_poignee' && s.status === 'playing') return;
 
@@ -288,8 +304,10 @@ class Tarot {
   _handleBid(seat, contract) {
     const s = this.state;
     const highest = this._highestBid();
+    if (s.passed[seat]) return; // un joueur qui a passé ne parle plus
     if (contract === 'pass') {
       s.bids[seat] = 'pass';
+      s.passed[seat] = true;
       this.log(`🚫 ${this.nameOf(seat)} passe.`);
     } else {
       if (!CONTRACTS.includes(contract)) return;
@@ -299,9 +317,27 @@ class Tarot {
     }
     s.bidsCount++;
 
-    if (s.bidsCount >= this.N) return this._resolveBidding();
-    s.turnSeat = this._next(s.turnSeat);
+    // Les enchères tournent tant qu'il reste plus d'un joueur en lice : un joueur dont
+    // la mise a été surenchérie peut donc surenchérir à son tour.
+    const alive = this._allSeats().filter((x) => !s.passed[x]);
+    if (alive.length === 0) return this._resolveBidding();               // tout le monde a passé
+    if (alive.length === 1 && s.bids[alive[0]] && s.bids[alive[0]] !== 'pass') {
+      return this._resolveBidding();                                      // un seul enchérisseur debout
+    }
+    let n = this._next(seat);
+    for (let g = 0; g < this.N && s.passed[n]; g++) n = this._next(n);
+    s.turnSeat = n;
     this.broadcastState();
+  }
+
+  // Annonce la redonne, laisse les clients ramasser les cartes, puis redistribue.
+  _announceRedeal(reason, who = null) {
+    const s = this.state;
+    if (s.redealing) return;
+    s.redealing = true;
+    this.io.to(this.roomCode).emit('tarot_redeal', { reason, who });
+    this.broadcastState();
+    setTimeout(() => this._beginHand(true), REDEAL_PAUSE_MS);
   }
 
   _highestBid() {
@@ -317,14 +353,11 @@ class Tarot {
     const best = this._highestBid();
     if (!best) {
       this.log(`♻️ Tout le monde passe — on redonne.`);
-      this._beginHand(true);
+      this._announceRedeal('all_pass');
       return;
     }
-    let takerSeat = null;
-    for (let k = 0; k < this.N; k++) {
-      const seat = (this.dealerSeat + 1 + k) % this.N;
-      if (s.bids[seat] === best) takerSeat = seat;
-    }
+    const takerSeat = this._orderFrom(this._next(this.dealerSeat)).find((seat) => s.bids[seat] === best);
+    if (takerSeat == null) { this._announceRedeal('all_pass'); return; }
     s.takerSeat = takerSeat;
     s.contract = best;
     this.log(`🎯 ${this.nameOf(takerSeat)} est preneur — ${CONTRACT_LABEL[best]}.`);
@@ -415,20 +448,58 @@ class Tarot {
     this.broadcastState();
   }
 
-  _handlePoignee(seat, kind) {
+  _handlePoignee(seat, kind, cardIds) {
     const s = this.state;
+    const err = (m) => this.io.to(this.players[seat].id).emit('tarot_error', m);
     if (!this.allowHandful) return;
     if (s.firstCardPlayed[seat]) return;
     if (s.poignees.some((p) => p.seat === seat)) return;
     const def = this.poigneeDefs[kind];
     if (!def) return;
-    const trumps = s.hands[seat].filter((c) => isTrump(c) || isExcuse(c));
-    if (trumps.length < def.count) {
-      this.io.to(this.players[seat].id).emit('tarot_error', `Il faut ${def.count} atouts pour cette poignée.`);
+
+    const hand = s.hands[seat];
+    const trumpCount = hand.filter(isTrump).length;
+    const hasExcuse = hand.some(isExcuse);
+    if (trumpCount + (hasExcuse ? 1 : 0) < def.count) {
+      err(`Il faut ${def.count} atouts pour cette poignée.`);
       return;
     }
-    s.poignees.push({ seat, kind, count: def.count, bonus: def.bonus });
-    this.log(`✋ ${this.nameOf(seat)} présente une poignée (${def.count} atouts, +${def.bonus}).`);
+
+    // Le joueur choisit lui-même les cartes qu'il montre.
+    const ids = [...new Set(Array.isArray(cardIds) ? cardIds : [])];
+    if (ids.length !== def.count) {
+      err(`Montre exactement ${def.count} cartes pour cette poignée.`);
+      return;
+    }
+    const chosen = [];
+    for (const id of ids) {
+      const c = hand.find((x) => cardId(x) === id);
+      if (!c) { err('Carte introuvable dans ta main.'); return; }
+      if (!isTrump(c) && !isExcuse(c)) { err("Une poignée ne contient que des atouts (ou l'Excuse)."); return; }
+      chosen.push(c);
+    }
+    // L'Excuse ne compte dans une poignée que si elle la complète : il faut alors
+    // montrer TOUS ses atouts (donc en avoir exactement def.count - 1).
+    if (chosen.some(isExcuse) && trumpCount !== def.count - 1) {
+      err("L'Excuse ne compte que si tu montres tous tes atouts et qu'il t'en manque un.");
+      return;
+    }
+    // Le plus petit et le plus grand atout de la main doivent figurer dans la poignée.
+    const bounds = this._trumpBounds(hand);
+    if (bounds) {
+      const shown = new Set(chosen.map(cardId));
+      if (!shown.has(cardId(bounds.low)) || !shown.has(cardId(bounds.high))) {
+        err(`Ta poignée doit montrer ton plus petit (${frCard(bounds.low)}) et ton plus grand atout (${frCard(bounds.high)}).`);
+        return;
+      }
+    }
+
+    const cards = chosen.map((c) => ({ suit: c.suit, value: c.value }));
+    s.poignees.push({ seat, kind, count: def.count, bonus: def.bonus, cards });
+    this.log(`✋ ${this.nameOf(seat)} présente une poignée (${def.count} atouts, +${def.bonus}) : ${chosen.map(frCard).join(', ')}.`);
+    this.io.to(this.roomCode).emit('tarot_poignee_shown', {
+      seat, name: this.nameOf(seat), kind, count: def.count, bonus: def.bonus, cards,
+    });
     this.broadcastState();
   }
 
@@ -606,7 +677,7 @@ class Tarot {
       defPts: Math.round(defPtsExact * 10) / 10,
       made, diff,
       petitBout: petitBoutSigned, petitInLast: !!petitInLast,
-      poignees: s.poignees.map((p) => ({ name: this.nameOf(p.seat), count: p.count, bonus: p.bonus })),
+      poignees: s.poignees.map((p) => ({ name: this.nameOf(p.seat), count: p.count, bonus: p.bonus, cards: p.cards || [] })),
       poigneeSigned,
       slamLabel, slamSigned,
       base: (25 + diff) * (made ? 1 : -1),
@@ -707,17 +778,37 @@ class Tarot {
     return trumps.concat(excuse);
   }
 
+  // Atout le plus faible et le plus fort d'une main (l'Excuse n'en est pas un).
+  _trumpBounds(hand) {
+    const trumps = hand.filter(isTrump);
+    if (!trumps.length) return null;
+    const num = (c) => parseInt(c.value, 10);
+    let low = trumps[0], high = trumps[0];
+    for (const t of trumps) {
+      if (num(t) < num(low)) low = t;
+      if (num(t) > num(high)) high = t;
+    }
+    return { low, high };
+  }
+
   _poigneeOffer(seat) {
     const s = this.state;
     if (!this.allowHandful || s.status !== 'playing') return null;
     if (s.firstCardPlayed[seat]) return null;
     if (s.poignees.some((p) => p.seat === seat)) return null;
-    const n = s.hands[seat].filter((c) => isTrump(c) || isExcuse(c)).length;
+    const trumpCount = s.hands[seat].filter(isTrump).length;
+    const hasExcuse = s.hands[seat].some(isExcuse);
+    const n = trumpCount + (hasExcuse ? 1 : 0);
     const kinds = [];
-    if (n >= this.poigneeDefs.simple.count) kinds.push('simple');
-    if (n >= this.poigneeDefs.double.count) kinds.push('double');
-    if (n >= this.poigneeDefs.triple.count) kinds.push('triple');
-    return kinds.length ? { count: n, kinds } : null;
+    for (const k of ['simple', 'double', 'triple']) {
+      if (n >= this.poigneeDefs[k].count) kinds.push(k);
+    }
+    const bounds = this._trumpBounds(s.hands[seat]);
+    return kinds.length ? {
+      count: n, trumpCount, hasExcuse, kinds,
+      lowTrump: bounds ? cardId(bounds.low) : null,
+      highTrump: bounds ? cardId(bounds.high) : null,
+    } : null;
   }
 
   // ---------- diffusion ----------
@@ -737,6 +828,8 @@ class Tarot {
         totalDeals: this.totalDeals,
         targetScore: this.targetScore,
         handNumber: this.handNumber,
+        dealId: this.dealId,
+        redealing: !!s.redealing,
         tricksTotal: this.tricksTotal,
         scores: this.scores.slice(),
         mySeat: seat,
@@ -764,7 +857,11 @@ class Tarot {
         partnerSeat: revealPartner ? s.partnerSeat : null,
         iAmPartner: (this.N === 5 && s.partnerSeat === seat) ? true : false,
         slam: s.slam,
-        poignees: s.poignees.map((pg) => ({ seat: pg.seat, name: this.nameOf(pg.seat), count: pg.count })),
+        poignees: s.poignees.map((pg) => ({
+          seat: pg.seat, name: this.nameOf(pg.seat), kind: pg.kind,
+          count: pg.count, bonus: pg.bonus, cards: pg.cards || [],
+        })),
+        poigneeDefs: this.poigneeDefs,
         myHand: sortHand(s.hands[seat] || []),
         myLegalCards: myLegal,
         poigneeOffer: this._poigneeOffer(seat),
@@ -782,6 +879,7 @@ class Tarot {
           isPartner: revealPartner && s.partnerSeat === pp.seat,
           isTurn: s.turnSeat === pp.seat && !s.resolving && (s.status === 'playing' || s.status === 'bidding'),
           bid: s.bids[pp.seat],
+          passed: !!s.passed[pp.seat],
           tricksWon: s.tricksWon[pp.seat],
           handCount: (s.hands[pp.seat] || []).length,
           hasPoignee: s.poignees.some((pg) => pg.seat === pp.seat),

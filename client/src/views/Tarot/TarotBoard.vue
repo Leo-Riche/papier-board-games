@@ -9,6 +9,34 @@
       <div class="tf-contract">{{ takerFlash.contract }}</div>
     </div>
 
+    <!-- Redonne : tout le monde a passé, ou Petit sec -->
+    <div v-if="redealFlash" class="redeal-flash">
+      <div class="rf-cards">
+        <span v-for="n in 5" :key="n" class="rf-card" :style="{ '--ri': n - 1 }"></span>
+      </div>
+      <div class="rf-title">{{ redealFlash.title }}</div>
+      <div class="rf-sub">♻️ On redonne</div>
+    </div>
+
+    <!-- Poignée présentée : montrée à tous -->
+    <div v-if="poigneeShow" class="pg-overlay">
+      <div class="pg-box">
+        <div class="pg-title">✋ {{ poigneeShow.name }} présente une poignée</div>
+        <div class="pg-meta">
+          Poignée {{ poigneeKindName(poigneeShow.kind) }} · {{ poigneeShow.count }} atouts · +{{ poigneeShow.bonus }}
+        </div>
+        <div class="pg-cards">
+          <TarotCard
+            v-for="(c, i) in poigneeShow.cards"
+            :key="cid(c)"
+            :card="c"
+            class="pg-card"
+            :style="{ '--ci': i }"
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- ============ SALLE D'ATTENTE ============ -->
     <div v-if="gameStatus === 'waiting'" class="waiting-screen">
       <h1>Tarot 🃏</h1>
@@ -113,7 +141,9 @@
           >{{ s.name }} <b>{{ s.score }}</b></span>
         </div>
         <div class="tb-right">
-          <span v-if="calledCard" class="tb-called" :class="suitColorName(calledCard.suit)" title="Carte appelée">📣 {{ calledCardLabel }}</span>
+          <span v-if="calledCard" class="tb-called" :class="suitColorName(calledCard.suit)" title="Carte appelée">
+            📣 Appel <b>{{ calledCardLabel }}</b>
+          </span>
           <span v-if="takerName" class="tb-taker">👑 {{ takerName }}</span>
           <button
             v-if="amIHost && gameStatus !== 'hand_over'"
@@ -125,12 +155,12 @@
       </div>
 
       <!-- Table -->
-      <div class="felt">
+      <div class="felt" :class="{ 'my-turn': myTurnActive }">
         <div
           v-for="op in opponentSeats"
           :key="op.seat"
           class="seat"
-          :class="[op.pos, { turn: op.isTurn }]"
+          :class="[op.pos, { turn: op.isTurn, out: gameStatus === 'bidding' && op.passed }]"
         >
           <div class="seat-head">
             <span class="seat-nom">{{ op.name }}</span>
@@ -146,7 +176,7 @@
             {{ bidLabel(op.bid) }}
           </div>
           <div v-if="op.hasPoignee" class="poignee-badge">✋ Poignée</div>
-          <div class="hidden-hand" :class="{ dealing }">
+          <div class="hidden-hand" :class="{ dealing, collecting }">
             <TarotCard
               v-for="n in Math.min(op.handCount, 12)"
               :key="n"
@@ -157,12 +187,31 @@
           </div>
         </div>
 
-        <!-- Chien dévoilé (pendant l'écart) -->
-        <div v-if="gameStatus === 'ecart' && chienRevealed && chien" class="chien-zone">
-          <div class="chien-tag">Le Chien</div>
-          <div class="chien-cards">
-            <TarotCard v-for="c in chien" :key="cid(c)" :card="c" class="chien-card" />
+        <!-- Roi appelé (à 5 joueurs) -->
+        <div v-if="calledCard && playerCount === 5" class="called-zone" :class="{ revealed: partnerSeat != null }">
+          <TarotCard :card="calledCard" class="cz-card" />
+          <div class="cz-txt">
+            <div class="cz-tag">{{ calledCardTitle }}</div>
+            <div v-if="partnerSeat != null" class="cz-sub partner">🤝 {{ nameOfSeat(partnerSeat) }}</div>
+            <div v-else-if="iHoldCalledCard" class="cz-sub mine">Dans ton jeu</div>
+            <div v-else class="cz-sub">Partenaire inconnu</div>
           </div>
+        </div>
+
+        <!-- Le Chien -->
+        <div v-if="showChien" class="chien-zone" :class="{ open: chienOpen }">
+          <div class="chien-tag">Le Chien · {{ ecartSize }} carte{{ ecartSize > 1 ? 's' : '' }}</div>
+          <div class="chien-cards">
+            <template v-if="chienOpen">
+              <TarotCard v-for="(c, i) in chien" :key="cid(c)" :card="c" class="chien-card" :style="{ '--ci': i }" />
+            </template>
+            <template v-else>
+              <TarotCard v-for="n in ecartSize" :key="n" face-down class="chien-card" :style="{ '--ci': n - 1 }" />
+            </template>
+          </div>
+          <div v-if="chienOpen" class="chien-sub">{{ takerName }} constitue son jeu…</div>
+          <div v-else-if="gameStatus === 'ecart'" class="chien-sub">{{ contractLabel }} — le Chien reste caché</div>
+          <div v-else class="chien-sub">Enchères en cours…</div>
         </div>
 
         <!-- Pli au centre -->
@@ -221,11 +270,18 @@
             >{{ callRankLabel }} <span class="call-suit">{{ suitSym(su) }}</span></button>
           </div>
         </div>
+
+        <!-- C'est à toi -->
+        <div v-if="myTurnBig" class="turn-beacon">
+          <span class="tbn-star">⭐</span>
+          <span class="tbn-text">À toi de jouer</span>
+        </div>
       </div>
 
       <!-- Zone du bas : moi -->
       <div class="my-zone">
-        <div class="my-head">
+        <div class="my-head" :class="{ turn: myTurnActive }">
+          <span v-if="myTurnActive" class="my-turn-pill">⭐ À toi</span>
           <strong>{{ myName }}</strong>
           <span v-if="me?.isDealer" class="mini-badge dealer">Donneur</span>
           <span v-if="me?.isTaker" class="mini-badge taker">👑 Preneur</span>
@@ -254,31 +310,51 @@
           {{ takerName }} constitue son jeu…
         </div>
 
-        <!-- Poignée proposée -->
-        <div v-if="showPoigneeOffer" class="poignee-bar">
-          <span>Tu as {{ poigneeOffer.count }} atouts — présenter une poignée ?</span>
-          <button v-for="k in poigneeOffer.kinds" :key="k" class="btn-act take small" @click="act('declare_poignee', { kind: k })">
+        <!-- Poignée : proposition, puis choix des cartes montrées -->
+        <div v-if="showPoigneeOffer && !poigneeMode" class="poignee-bar">
+          <span>✋ Tu as {{ poigneeOffer.count }} atout{{ poigneeOffer.count > 1 ? 's' : '' }} — présenter une poignée ?</span>
+          <button v-for="k in poigneeOffer.kinds" :key="k" class="btn-act take small" @click="startPoignee(k)">
             {{ poigneeKindLabel(k) }}
           </button>
           <button class="btn-act small" @click="poigneeDismissed = true">Non</button>
         </div>
+        <div v-else-if="poigneeMode" class="poignee-bar active">
+          <span>{{ poigneeKindLabel(poigneeMode) }} — choisis les cartes montrées
+            <strong>({{ poigneeSel.size }}/{{ poigneeNeed }})</strong></span>
+          <span class="pg-hint">🔒 Ton plus petit et ton plus grand atout sont obligatoires.</span>
+          <span class="pg-hint">{{ excuseAllowedInPoignee
+            ? "🎭 L'Excuse complète ta poignée (tous tes atouts sont montrés)."
+            : "🎭 L'Excuse ne compte pas dans cette poignée." }}</span>
+          <button class="btn-act take small" :disabled="poigneeSel.size !== poigneeNeed" @click="validatePoignee">Montrer</button>
+          <button class="btn-act small" @click="cancelPoignee">Annuler</button>
+        </div>
 
-        <!-- Ma main -->
-        <div class="my-hand" :class="{ dealing }" v-if="myHand.length">
-          <div
-            v-for="(c, i) in myHand"
-            :key="cid(c)"
-            class="hand-card"
-            :class="{
-              playable: canPlay(c),
-              selected: gameStatus === 'ecart' && ecartSel.has(cid(c)),
-              forbidden: gameStatus === 'ecart' && canEcart && !isEcartable(c),
-            }"
-            :style="{ marginLeft: i > 0 ? handOverlap : '0', '--di': i }"
-            @click="onCardClick(c)"
-          >
-            <TarotCard :card="c" class="hc" />
+        <!-- Ma main (centrée, réordonnable au drag & drop) -->
+        <div class="my-hand" :class="{ dealing, collecting, dragging: dragId !== null }" v-if="displayHand.length" ref="handEl">
+          <div class="hand-rail" ref="railEl">
+            <div
+              v-for="(c, i) in displayHand"
+              :key="cid(c)"
+              class="hand-card"
+              :class="{
+                playable: canPlay(c),
+                selected: isCardSelected(c),
+                forbidden: isCardForbidden(c),
+                called: isCalledCard(c),
+                'pg-anchor': poigneeAnchors.has(cid(c)),
+                grabbed: dragId === cid(c),
+              }"
+              :style="{ marginLeft: i > 0 ? handOverlap : '0', '--di': i, zIndex: dragId === cid(c) ? 60 : i }"
+              @pointerdown="onCardPointerDown($event, c)"
+              @click="onCardClick(c)"
+            >
+              <TarotCard :card="c" class="hc" />
+            </div>
           </div>
+        </div>
+        <div v-if="displayHand.length" class="hand-tools">
+          <span class="ht-hint">↕ Glisse une carte vers le haut puis sur le côté pour la ranger</span>
+          <button v-if="manualOrder" class="btn-act small" @click="resetOrder">Tri automatique</button>
         </div>
       </div>
 
@@ -365,6 +441,15 @@
               </tr>
             </tbody>
           </table>
+
+          <div v-if="poigneeRecap.length" class="recap-pg">
+            <div v-for="(p, i) in poigneeRecap" :key="i" class="recap-pg-row">
+              <span class="rpg-name">✋ {{ p.name }} <span class="muted">({{ p.count }} at., +{{ p.bonus }})</span></span>
+              <div class="rpg-cards">
+                <TarotCard v-for="c in p.cards" :key="cid(c)" :card="c" class="rpg-card" />
+              </div>
+            </div>
+          </div>
 
           <div class="recap-players">
             <div v-for="s in seats" :key="s.seat" class="rp-row" :class="{ taker: s.seat === handResult.takerSeat || s.seat === handResult.partnerSeat, me: s.seat === mySeat }">
@@ -496,6 +581,25 @@ const matchOver = ref(false)
 const ecartSel = ref(new Set())
 const poigneeDismissed = ref(false)
 
+// --- poignée : choix des cartes montrées ---
+const poigneeDefs = ref(null)
+const poigneeMode = ref(null)
+const poigneeSel = ref(new Set())
+const poigneeShow = ref(null)
+let poigneeShowTimer = null
+
+// --- rangement manuel de la main (drag & drop), valable pour la donne ---
+const manualOrder = ref(null)
+const handEl = ref(null)
+const railEl = ref(null)
+const handWidth = ref(0)
+let handRO = null
+const dragId = ref(null)
+let dragFrom = null
+let dragStart = null
+let dragMoved = false
+let suppressClick = false
+
 const gameLogs = ref([])
 const toast = ref('')
 let toastTimer = null
@@ -504,7 +608,25 @@ let takerFlashTimer = null
 
 // deal animation
 const dealing = ref(false)
+const collecting = ref(false)   // les cartes de la donne annulée sont ramassées
+const dealId = ref(0)
+const redealFlash = ref(null)
 let dealTimer = null
+let redealTimer = null
+
+const REDEAL_TITLE = {
+  all_pass: 'Tout le monde passe',
+  petit_sec: 'Petit sec',
+}
+function runRedealSequence(d) {
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  redealFlash.value = {
+    title: d.reason === 'petit_sec' && d.who ? `Petit sec chez ${d.who}` : (REDEAL_TITLE[d.reason] || 'Donne annulée'),
+  }
+  collecting.value = !reduce
+  clearTimeout(redealTimer)
+  redealTimer = setTimeout(() => { redealFlash.value = null }, 1800)
+}
 function runDealSequence() {
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   if (reduce) { dealing.value = false; return }
@@ -537,7 +659,30 @@ const canStartGame = computed(() =>
 const modeLabel = computed(() => scoreMode.value === 'fixed' ? `${totalDeals.value} donnes`
   : scoreMode.value === 'target' ? `Objectif ${targetScore.value} pts`
   : scoreMode.value === 'endless' ? 'Infinie' : 'Donne unique')
-const handOverlap = computed(() => (myHand.value.length > 14 ? '-34px' : myHand.value.length > 9 ? '-26px' : '-16px'))
+// Main telle qu'elle est affichée : ordre du serveur, ou ordre manuel du joueur.
+// Les cartes inconnues de l'ordre manuel (celles du Chien) viennent à la fin.
+const displayHand = computed(() => {
+  if (!manualOrder.value) return myHand.value
+  const pos = new Map(manualOrder.value.map((id, i) => [id, i]))
+  const rank = (c) => (pos.has(cid(c)) ? pos.get(cid(c)) : Number.MAX_SAFE_INTEGER)
+  return myHand.value.slice().sort((a, b) => rank(a) - rank(b))
+})
+
+// Largeur d'une carte : doit suivre les règles CSS de .hand-card .hc
+const handCardWidth = computed(() => (handWidth.value && handWidth.value < 660 ? 66 : 96))
+// Chevauchement adaptatif : la main est resserrée juste ce qu'il faut pour tenir
+// dans la largeur disponible — elle reste donc centrée au lieu de déborder.
+const handOverlap = computed(() => {
+  const n = displayHand.value.length
+  if (n < 2) return '0px'
+  const w = handCardWidth.value
+  const base = n > 14 ? -34 : n > 9 ? -26 : -16
+  const avail = handWidth.value
+  if (!avail) return `${base}px`
+  // marge gauche nécessaire pour que n cartes tiennent dans `avail`
+  const needed = (avail - 12 - w) / (n - 1) - w
+  return `${Math.round(Math.max(Math.min(base, needed), -w * 0.82))}px`
+})
 
 const seatsByScore = computed(() => seats.value.slice().sort((a, b) => a.seat - b.seat))
 const leaderSeat = computed(() => {
@@ -580,6 +725,38 @@ const showPoigneeOffer = computed(() =>
   gameStatus.value === 'playing' && poigneeOffer.value && !poigneeDismissed.value && !me.value?.hasPoignee
 )
 
+// --- mise en avant du tour ---
+const myTurnActive = computed(() => {
+  if (resolving.value || reviewLocked.value) return false
+  if (gameStatus.value === 'playing' || gameStatus.value === 'bidding') return isMyTurn.value
+  if (gameStatus.value === 'calling') return canCall.value
+  return false
+})
+const myTurnBig = computed(() => gameStatus.value === 'playing' && myTurnActive.value)
+
+// --- le Chien ---
+const showChien = computed(() => ['bidding', 'calling', 'ecart'].includes(gameStatus.value))
+const chienOpen = computed(() => !!(chienRevealed.value && chien.value && chien.value.length))
+
+// --- poignée ---
+const poigneeNeed = computed(() =>
+  poigneeMode.value && poigneeDefs.value ? (poigneeDefs.value[poigneeMode.value]?.count || 0) : 0
+)
+// L'Excuse ne compte que si elle complète la poignée : il faut montrer tous ses atouts.
+const excuseAllowedInPoignee = computed(() =>
+  !!poigneeMode.value && !!poigneeOffer.value && poigneeOffer.value.hasExcuse
+  && poigneeOffer.value.trumpCount === poigneeNeed.value - 1
+)
+// Le plus petit et le plus grand atout de la main sont obligatoires dans la poignée.
+const poigneeAnchors = computed(() => {
+  const o = poigneeOffer.value
+  if (!poigneeMode.value || !o) return new Set()
+  return new Set([o.lowTrump, o.highTrump].filter(Boolean))
+})
+const poigneeRecap = computed(() =>
+  (handResult.value?.poignees || []).filter((p) => p.cards && p.cards.length)
+)
+
 const SUIT_SYM = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' }
 const RANK_FR = { R: 'Roi', D: 'Dame', C: 'Cavalier', V: 'Valet' }
 const suitSym = (s) => SUIT_SYM[s] || ''
@@ -589,6 +766,15 @@ const calledCardLabel = computed(() => {
   return `${RANK_FR[calledCard.value.value] || ''} ${SUIT_SYM[calledCard.value.suit] || ''}`
 })
 const callRankLabel = computed(() => RANK_FR[callRank.value] || 'Roi')
+const calledCardTitle = computed(() =>
+  calledCard.value ? `${RANK_FR[calledCard.value.value] || 'Roi'} appelé` : ''
+)
+const iHoldCalledCard = computed(() =>
+  !!calledCard.value && myHand.value.some((c) => c.suit === calledCard.value.suit && c.value === calledCard.value.value)
+)
+function isCalledCard(c) {
+  return !!calledCard.value && c.suit === calledCard.value.suit && c.value === calledCard.value.value
+}
 
 const feltTurnMine = computed(() =>
   !resolving.value && ((gameStatus.value === 'bidding' && isMyTurn.value) || (gameStatus.value === 'calling' && canCall.value))
@@ -602,7 +788,7 @@ const feltTurnText = computed(() => {
   }
   if (gameStatus.value === 'playing') {
     if (resolving.value && trickWinnerSeat.value != null) return `✋ ${nameOfSeat(trickWinnerSeat.value)} remporte le pli`
-    return isMyTurn.value ? '⭐ À toi de jouer' : ''
+    return '' // c'est la balise .turn-beacon qui annonce « à toi de jouer »
   }
   return ''
 })
@@ -621,14 +807,16 @@ function nameById(id) { return allConnectedPlayers.value.find((p) => p.id === id
 function shortName(n) { return (n || '').length > 6 ? n.slice(0, 5) + '…' : n }
 function bidLabel(b) { return b === 'pass' ? 'Passe' : (CONTRACT_LABEL[b] || b) }
 function poigneeKindLabel(k) { return { simple: 'Simple (+20)', double: 'Double (+30)', triple: 'Triple (+40)' }[k] || k }
+function poigneeKindName(k) { return { simple: 'simple', double: 'double', triple: 'triple' }[k] || k }
 
-// index d'écran : 0 = moi (bas), puis dans le sens du jeu
-function screenIdx(seat) { return (seat - mySeat.value + playerCount.value) % playerCount.value }
-// disposition des places selon le nombre de joueurs (screenIdx → position sur le tapis)
+// index d'écran : 0 = moi (bas), puis dans le sens du jeu (antihoraire : le suivant
+// est le siège précédent, et il s'affiche à ma droite)
+function screenIdx(seat) { return (mySeat.value - seat + playerCount.value) % playerCount.value }
+// disposition des places : bas → droite → haut → gauche (sens antihoraire à l'écran)
 const POS_LAYOUT = {
-  3: ['bottom', 'topleft', 'topright'],
-  4: ['bottom', 'left', 'top', 'right'],
-  5: ['bottom', 'left', 'topleft', 'topright', 'right'],
+  3: ['bottom', 'topright', 'topleft'],
+  4: ['bottom', 'right', 'top', 'left'],
+  5: ['bottom', 'right', 'topright', 'topleft', 'left'],
 }
 function posClass(seat) {
   const layout = POS_LAYOUT[playerCount.value] || POS_LAYOUT[4]
@@ -641,18 +829,142 @@ const opponentSeats = computed(() =>
 
 function isEcartable(c) { return !isKingC(c) && !isOudlerC(c) }
 function canPlay(c) {
+  if (poigneeMode.value) return false
   return gameStatus.value === 'playing' && isMyTurn.value && !reviewLocked.value && legalSet.value.has(cid(c))
 }
+function isCardSelected(c) {
+  const id = cid(c)
+  if (poigneeMode.value) return poigneeSel.value.has(id)
+  return gameStatus.value === 'ecart' && ecartSel.value.has(id)
+}
+function isCardForbidden(c) {
+  if (poigneeMode.value) return !isPoigneePickable(c)
+  return gameStatus.value === 'ecart' && canEcart.value && !isEcartable(c)
+}
 function onCardClick(c) {
+  if (suppressClick) { suppressClick = false; return }
+  if (poigneeMode.value) return togglePoignee(c)
   if (gameStatus.value === 'ecart' && canEcart.value) {
     const id = cid(c)
     if (ecartSel.value.has(id)) { ecartSel.value.delete(id); ecartSel.value = new Set(ecartSel.value); return }
     if (!isEcartable(c)) { showToast('Un Roi ou un Bout ne peut pas être écarté.'); return }
-    if (ecartSel.value.size >= 6) { showToast('6 cartes maximum.'); return }
+    if (ecartSel.value.size >= ecartSize.value) { showToast(`${ecartSize.value} cartes maximum.`); return }
     ecartSel.value.add(id); ecartSel.value = new Set(ecartSel.value)
     return
   }
   if (canPlay(c)) act('play_card', { cardId: cid(c) })
+}
+
+// ---- poignée : choix des cartes montrées ----
+function isPoigneePickable(c) {
+  if (!poigneeMode.value) return false
+  if (isExcuseC(c)) return excuseAllowedInPoignee.value
+  return isTrumpC(c)
+}
+function startPoignee(kind) {
+  poigneeMode.value = kind
+  const need = poigneeDefs.value?.[kind]?.count || 0
+  // pré-sélection : les atouts les plus forts, complétés par l'Excuse si nécessaire
+  const trumps = myHand.value.filter(isTrumpC)
+    .sort((a, b) => parseInt(b.value, 10) - parseInt(a.value, 10))
+  const sel = new Set()
+  // le plus fort et le plus faible sont imposés, le reste est complété par les plus forts
+  if (trumps.length) { sel.add(cid(trumps[0])); sel.add(cid(trumps[trumps.length - 1])) }
+  for (const t of trumps) { if (sel.size >= need) break; sel.add(cid(t)) }
+  if (sel.size < need) {
+    const exc = myHand.value.find(isExcuseC)
+    if (exc) sel.add(cid(exc))
+  }
+  poigneeSel.value = sel
+}
+function cancelPoignee() { poigneeMode.value = null; poigneeSel.value = new Set() }
+function togglePoignee(c) {
+  const id = cid(c)
+  if (poigneeSel.value.has(id)) {
+    if (poigneeAnchors.value.has(id)) {
+      showToast('Ton plus petit et ton plus grand atout doivent rester montrés.')
+      return
+    }
+    poigneeSel.value.delete(id); poigneeSel.value = new Set(poigneeSel.value); return
+  }
+  if (!isPoigneePickable(c)) {
+    showToast(isExcuseC(c)
+      ? "L'Excuse ne compte que si elle complète la poignée (tous tes atouts montrés)."
+      : 'Une poignée ne contient que des atouts.')
+    return
+  }
+  if (poigneeSel.value.size >= poigneeNeed.value) {
+    showToast(`${poigneeNeed.value} cartes pour cette poignée.`); return
+  }
+  poigneeSel.value.add(id); poigneeSel.value = new Set(poigneeSel.value)
+}
+function validatePoignee() {
+  if (poigneeSel.value.size !== poigneeNeed.value) return
+  act('declare_poignee', { kind: poigneeMode.value, cardIds: [...poigneeSel.value] })
+  cancelPoignee()
+}
+
+// ---- rangement manuel de la main ----
+function resetOrder() { manualOrder.value = null }
+
+function onCardPointerDown(e, c) {
+  if (e.button != null && e.button > 0) return
+  dragStart = { x: e.clientX, y: e.clientY, id: cid(c), pointerId: e.pointerId, el: e.currentTarget }
+  dragMoved = false
+  window.addEventListener('pointermove', onHandPointerMove, { passive: false })
+  window.addEventListener('pointerup', onHandPointerUp)
+  window.addEventListener('pointercancel', onHandPointerUp)
+}
+
+function onHandPointerMove(e) {
+  if (!dragStart) return
+  const dx = e.clientX - dragStart.x
+  const dy = e.clientY - dragStart.y
+  if (!dragMoved) {
+    // souris : un simple déplacement suffit ; tactile : il faut d'abord lever la carte,
+    // pour que les glissements horizontaux restent dédiés au défilement de la main.
+    const begin = e.pointerType === 'mouse'
+      ? Math.abs(dx) + Math.abs(dy) > 8
+      : dy < -14 && Math.abs(dy) > Math.abs(dx)
+    if (!begin) return
+    dragMoved = true
+    dragId.value = dragStart.id
+    const order = displayHand.value.map(cid)
+    manualOrder.value = order
+    dragFrom = order.indexOf(dragStart.id)
+    try { dragStart.el.setPointerCapture(dragStart.pointerId) } catch { /* non supporté */ }
+  }
+  if (e.cancelable) e.preventDefault()
+  moveDragTo(e.clientX)
+}
+
+function moveDragTo(clientX) {
+  const rail = railEl.value
+  if (!rail || dragFrom === null || !manualOrder.value) return
+  const cards = [...rail.querySelectorAll('.hand-card')]
+  if (!cards.length) return
+  let target = cards.length - 1
+  for (let i = 0; i < cards.length; i++) {
+    const r = cards[i].getBoundingClientRect()
+    if (clientX < r.left + r.width / 2) { target = i; break }
+  }
+  if (target === dragFrom) return
+  const order = manualOrder.value.slice()
+  const [id] = order.splice(dragFrom, 1)
+  order.splice(target, 0, id)
+  manualOrder.value = order
+  dragFrom = target
+}
+
+function onHandPointerUp() {
+  window.removeEventListener('pointermove', onHandPointerMove)
+  window.removeEventListener('pointerup', onHandPointerUp)
+  window.removeEventListener('pointercancel', onHandPointerUp)
+  if (dragMoved) suppressClick = true
+  dragStart = null
+  dragMoved = false
+  dragFrom = null
+  dragId.value = null
 }
 function validateEcart() {
   if (!ecartValid.value) return
@@ -714,13 +1026,26 @@ watch(allConnectedPlayers, (list) => {
   }
 })
 
-// rejoue l'animation de distribution à chaque nouvelle donne
-watch(() => `${gameStatus.value}|${handNumber.value}`, (now, prev) => {
-  if (gameStatus.value === 'bidding' && (!prev || !prev.startsWith('bidding'))) runDealSequence()
+// rejoue l'animation de distribution à chaque donne, redonnes comprises
+watch(dealId, (v) => {
+  if (!v) return
+  collecting.value = false
+  runDealSequence()
 })
 
 // ---- socket ----
 onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') {
+    handRO = new ResizeObserver((entries) => {
+      for (const e of entries) handWidth.value = e.contentRect.width
+    })
+    watch(handEl, (el, old) => {
+      if (old) handRO.unobserve(old)
+      if (el) { handRO.observe(el); handWidth.value = el.clientWidth }
+      else handWidth.value = 0
+    }, { immediate: true })
+  }
+
   const sendName = () => {
     const saved = localStorage.getItem('temp_player_name')
     if (saved) socket.emit('set_player_name', { name: saved, roomCode, maxPlayers: 5 })
@@ -758,6 +1083,7 @@ onMounted(() => {
     if (d.playerCount) playerCount.value = d.playerCount
     if (d.tricksTotal) tricksTotal.value = d.tricksTotal
     handNumber.value = d.handNumber
+    if (d.dealId) dealId.value = d.dealId
     scores.value = d.scores
     mySeat.value = d.mySeat
     amIHost.value = d.isHost
@@ -787,6 +1113,8 @@ onMounted(() => {
     myHand.value = d.myHand || []
     myLegalCards.value = d.myLegalCards || []
     poigneeOffer.value = d.poigneeOffer || null
+    if (d.poigneeDefs) poigneeDefs.value = d.poigneeDefs
+    if (!d.poigneeOffer) cancelPoignee()
     currentTrick.value = d.currentTrick || []
     leadSuit.value = d.leadSuit
     lastTrick.value = d.lastTrick || null
@@ -800,13 +1128,26 @@ onMounted(() => {
     if (d.totalDeals) totalDeals.value = d.totalDeals
     if (d.targetScore) targetScore.value = d.targetScore
 
-    if (d.status === 'bidding') { ecartSel.value = new Set(); poigneeDismissed.value = false }
+    if (d.status === 'bidding') {
+      ecartSel.value = new Set()
+      poigneeDismissed.value = false
+      manualOrder.value = null
+      cancelPoignee()
+    }
     // flash preneur quand il vient d'être désigné
     if (d.takerSeat != null && d.takerSeat !== prevTaker && (d.status === 'ecart' || d.status === 'calling')) {
       takerFlash.value = { name: d.takerName, contract: d.contractLabel }
       clearTimeout(takerFlashTimer)
       takerFlashTimer = setTimeout(() => { takerFlash.value = null }, 2400)
     }
+  })
+
+  socket.on('tarot_redeal', (d) => runRedealSequence(d || {}))
+
+  socket.on('tarot_poignee_shown', (d) => {
+    poigneeShow.value = d
+    clearTimeout(poigneeShowTimer)
+    poigneeShowTimer = setTimeout(() => { poigneeShow.value = null }, 5500)
   })
 
   socket.on('action_log', (msg) => {
@@ -826,6 +1167,10 @@ onUnmounted(() => {
   clearTimeout(toastTimer)
   clearTimeout(takerFlashTimer)
   clearTimeout(dealTimer)
+  clearTimeout(poigneeShowTimer)
+  clearTimeout(redealTimer)
+  if (handRO) { handRO.disconnect(); handRO = null }
+  onHandPointerUp()
   if (showLastTrick.value) act('review', { open: false })
   socket.disconnect()
 })
@@ -848,6 +1193,36 @@ onUnmounted(() => {
 @keyframes tfFade { 0%{opacity:0} 8%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
 @keyframes tfPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .taker-flash, .tf-crown, .tf-name { animation: none !important; opacity: 1 !important; } }
+
+/* redonne */
+.redeal-flash {
+  position: fixed; inset: 0; z-index: 245; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  background: rgba(21,14,38,0.78); pointer-events: none;
+  animation: tfFade 1.8s ease forwards;
+}
+.rf-cards { display: flex; gap: 6px; margin-bottom: 6px; }
+.rf-card {
+  width: clamp(34px, 6vw, 52px); aspect-ratio: 92 / 142; border-radius: 6px;
+  border: 1.5px solid #4b2e83;
+  background:
+    repeating-linear-gradient(45deg, rgba(180,150,255,0.12) 0 3px, transparent 3px 11px),
+    repeating-linear-gradient(-45deg, rgba(180,150,255,0.12) 0 3px, transparent 3px 11px),
+    linear-gradient(145deg, #2a1a4d, #46307a);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+  animation: rfShuffle 0.9s cubic-bezier(0.3,0.1,0.3,1) infinite;
+  animation-delay: calc(var(--ri, 0) * 90ms);
+}
+.rf-title { font-size: clamp(1.4rem, 6vw, 2.6rem); font-weight: 900; color: #e8c46a; text-align: center; padding: 0 16px; }
+.rf-sub { font-size: 1rem; font-weight: 800; color: #cdb3e8; text-transform: uppercase; letter-spacing: 2.4px; }
+@keyframes rfShuffle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-16px) rotate(8deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .redeal-flash { animation: none; opacity: 1; }
+  .rf-card { animation: none; }
+}
 
 /* ===== salle d'attente ===== */
 .waiting-screen { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 30px 16px; }
@@ -895,8 +1270,9 @@ onUnmounted(() => {
 .tb-sc.mine { color: #efe8f7; }
 .tb-sc.lead b { color: #e8c46a; }
 .tb-taker { font-size: 0.85rem; color: #e8c46a; }
-.tb-called { font-size: 0.82rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: #150e26; border: 1px solid #453466; }
-.tb-called.red { color: #ff8a8a; } .tb-called.black { color: #cdb3e8; }
+.tb-called { font-size: 0.9rem; font-weight: 800; padding: 3px 12px; border-radius: 999px; background: rgba(232,196,106,0.12); border: 1px solid rgba(232,196,106,0.6); color: #e8c46a; box-shadow: 0 0 14px rgba(232,196,106,0.25); }
+.tb-called b { font-size: 1.1em; }
+.tb-called.red b { color: #ff9f9f; } .tb-called.black b { color: #fff7e6; }
 .tb-stop { background: transparent; color: #8a76ad; border: 1px solid #453466; border-radius: 7px; padding: 4px 10px; font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: 0.15s; }
 .tb-stop:hover { color: #ff8a8a; border-color: #ff8a8a; }
 
@@ -907,6 +1283,7 @@ onUnmounted(() => {
 }
 .seat { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 10px; border-radius: 12px; }
 .seat.turn { background: rgba(124,92,196,0.2); box-shadow: 0 0 16px rgba(124,92,196,0.45); }
+.seat.out { opacity: 0.5; }
 .seat.top { top: 8px; left: 50%; transform: translateX(-50%); flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 7px; row-gap: 3px; max-width: min(360px, 90vw); }
 .seat.top .hidden-hand { order: -1; flex-basis: 100%; justify-content: center; margin: 0 0 2px; }
 .seat.top .seat-sub::before { content: "· "; }
@@ -935,11 +1312,44 @@ onUnmounted(() => {
 .seat.left .mini-card, .seat.right .mini-card { width: 72px; height: 48px; }
 .seat.left .hidden-hand .mini-card + .mini-card, .seat.right .hidden-hand .mini-card + .mini-card { margin-left: 0; margin-top: -36px; }
 
-/* chien */
-.chien-zone { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px; background: rgba(21,14,38,0.72); padding: 10px 16px; border-radius: 14px; border: 1px solid rgba(196,160,80,0.4); }
-.chien-tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; color: #e8c46a; }
-.chien-cards { display: flex; gap: 5px; }
-.chien-card { width: 62px; height: 96px; }
+/* ===== roi appelé ===== */
+.called-zone {
+  position: absolute; left: 10px; bottom: 10px; z-index: 6;
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  padding: 7px 10px 7px 7px; border-radius: 14px;
+  background: rgba(21,14,38,0.86); border: 2px solid rgba(232,196,106,0.75);
+  box-shadow: 0 0 26px rgba(232,196,106,0.35), 0 8px 24px rgba(0,0,0,0.5);
+}
+.called-zone.revealed { border-color: rgba(125,214,160,0.8); box-shadow: 0 0 26px rgba(125,214,160,0.35), 0 8px 24px rgba(0,0,0,0.5); }
+.cz-txt { display: flex; flex-direction: column; gap: 2px; }
+.cz-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 900; color: #e8c46a; white-space: nowrap; }
+.called-zone.revealed .cz-tag { color: #7dd6a0; }
+.cz-card { width: 52px; height: 80px; box-shadow: 0 0 0 2px rgba(232,196,106,0.75), 0 6px 18px rgba(0,0,0,0.55); animation: czPulse 2.4s ease-in-out infinite; }
+.called-zone.revealed .cz-card { animation: none; box-shadow: 0 0 0 2px rgba(125,214,160,0.75), 0 6px 18px rgba(0,0,0,0.55); }
+.cz-sub { font-size: 0.68rem; font-weight: 700; color: #8a76ad; max-width: 96px; text-align: left; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-sub.partner { color: #7dd6a0; }
+.cz-sub.mine { color: #e8c46a; }
+@keyframes czPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(232,196,106,0.75), 0 6px 18px rgba(0,0,0,0.55); }
+  50% { box-shadow: 0 0 0 3px #e8c46a, 0 0 26px rgba(232,196,106,0.7), 0 6px 18px rgba(0,0,0,0.55); }
+}
+@media (prefers-reduced-motion: reduce) { .cz-card { animation: none !important; } }
+
+/* ===== chien ===== */
+.chien-zone {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: rgba(21,14,38,0.86); padding: 14px 22px; border-radius: 18px;
+  border: 2px solid rgba(196,160,80,0.45); box-shadow: 0 10px 34px rgba(0,0,0,0.55);
+}
+.chien-zone.open { border-color: rgba(232,196,106,0.8); box-shadow: 0 0 34px rgba(232,196,106,0.3), 0 10px 34px rgba(0,0,0,0.55); }
+.chien-tag { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 2.4px; font-weight: 900; color: #e8c46a; }
+.chien-sub { font-size: 0.8rem; color: #a690c9; font-style: italic; }
+.chien-cards { display: flex; gap: 8px; }
+.chien-card { width: 86px; height: 132px; }
+.chien-zone.open .chien-card { animation: chienFlip 0.45s cubic-bezier(0.2,0.8,0.3,1) backwards; animation-delay: calc(var(--ci, 0) * 90ms); }
+@keyframes chienFlip { from { opacity: 0; transform: rotateY(90deg) scale(0.8); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chien-zone.open .chien-card { animation: none !important; } }
 
 /* pli */
 .trick-zone { position: absolute; top: max(120px, 24%); bottom: 8%; left: 50%; width: min(52%, 440px); transform: translateX(-50%); }
@@ -971,6 +1381,45 @@ onUnmounted(() => {
 .ltv-name { font-size: 0.72rem; font-weight: 700; color: #cdb3e8; white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
 .review-lock-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 7; background: rgba(21,14,38,0.9); border: 1px solid rgba(232,196,106,0.5); color: #e8c46a; border-radius: 999px; padding: 6px 16px; font-size: 0.82rem; font-weight: 700; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
 
+/* ===== c'est à toi ===== */
+.felt.my-turn { border-color: rgba(232,196,106,0.85); box-shadow: inset 0 0 60px rgba(0,0,0,0.45), 0 0 0 2px rgba(232,196,106,0.5), 0 0 34px rgba(232,196,106,0.3); animation: feltTurn 2s ease-in-out infinite; }
+@keyframes feltTurn {
+  0%, 100% { box-shadow: inset 0 0 60px rgba(0,0,0,0.45), 0 0 0 2px rgba(232,196,106,0.45), 0 0 26px rgba(232,196,106,0.22); }
+  50% { box-shadow: inset 0 0 60px rgba(0,0,0,0.45), 0 0 0 3px rgba(232,196,106,0.9), 0 0 42px rgba(232,196,106,0.5); }
+}
+.turn-beacon {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 8;
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  padding: 10px 24px; border-radius: 999px;
+  background: linear-gradient(135deg, rgba(232,196,106,0.95), rgba(214,166,58,0.95));
+  color: #2a1a05; font-weight: 900; text-transform: uppercase; letter-spacing: 1.6px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55), 0 0 30px rgba(232,196,106,0.45);
+  animation: beaconIn 0.35s cubic-bezier(0.2,1.4,0.35,1), beaconPulse 1.7s ease-in-out 0.35s infinite;
+  pointer-events: none;
+}
+.tbn-star { font-size: 1.2rem; }
+.tbn-text { font-size: clamp(0.9rem, 2.4vw, 1.15rem); }
+@keyframes beaconIn { from { opacity: 0; transform: translateX(-50%) scale(0.75); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes beaconPulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.045); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .felt.my-turn, .turn-beacon { animation: none !important; }
+}
+.my-turn-pill { background: #e8c46a; color: #2a1a05; font-size: 0.7rem; font-weight: 900; padding: 2px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 1px; }
+.my-head.turn { color: #e8c46a; }
+
+/* ===== poignée présentée ===== */
+.pg-overlay { position: fixed; inset: 0; z-index: 240; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15,9,28,0.84); animation: tfPop 0.25s ease; }
+.pg-box { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 96vw; padding: 22px 26px; border-radius: 20px; background: #221739; border: 2px solid rgba(232,196,106,0.7); box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
+.pg-title { font-size: clamp(1.1rem, 3.4vw, 1.6rem); font-weight: 900; color: #e8c46a; text-align: center; }
+.pg-meta { font-size: 0.9rem; font-weight: 700; color: #cdb3e8; text-transform: uppercase; letter-spacing: 1.4px; }
+.pg-cards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 92vw; }
+.pg-card { width: clamp(44px, 7vw, 76px); aspect-ratio: 92 / 142; height: auto; animation: pgIn 0.3s ease backwards; animation-delay: calc(var(--ci, 0) * 55ms); }
+@keyframes pgIn { from { opacity: 0; transform: translateY(16px) scale(0.85); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pg-overlay, .pg-card { animation: none !important; } }
+
 /* bandeau action */
 .felt-panel { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: 94%; display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(21,14,38,0.82); border: 1px solid rgba(124,92,196,0.4); padding: 9px 20px; border-radius: 16px; box-shadow: 0 6px 22px rgba(0,0,0,0.55); }
 .felt-panel.you { border-color: rgba(232,196,106,0.6); box-shadow: 0 0 26px rgba(232,196,106,0.35); }
@@ -988,6 +1437,9 @@ onUnmounted(() => {
 .ecart-bar, .poignee-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; padding: 8px 12px; border-radius: 10px; background: #150e26; border: 1px solid rgba(196,160,80,0.2); font-size: 0.85rem; color: #cdb3e8; }
 .ecart-bar.waiting { color: #7a63a3; font-style: italic; }
 .ecart-info strong { color: #e8c46a; }
+.poignee-bar.active { border-color: rgba(232,196,106,0.6); box-shadow: 0 0 18px rgba(232,196,106,0.18); }
+.poignee-bar strong { color: #e8c46a; }
+.pg-hint { font-size: 0.78rem; color: #7a63a3; font-style: italic; }
 .slam-toggle { display: flex; align-items: center; gap: 6px; color: #a690c9; cursor: pointer; }
 .slam-toggle input { accent-color: #e8c46a; }
 
@@ -1002,8 +1454,20 @@ onUnmounted(() => {
 .btn-act.call.black .call-suit { color: #efe8f7; }
 .btn-act.small { padding: 6px 12px; font-size: 0.85rem; }
 
-.my-hand { display: flex; align-items: flex-end; padding: 28px 6px 10px; overflow-x: auto; overflow-y: hidden; }
-.hand-card { flex-shrink: 0; border-radius: 7px; transition: transform 0.12s ease, box-shadow 0.12s ease; cursor: default; }
+.my-hand { display: flex; padding: 28px 6px 10px; overflow-x: auto; overflow-y: hidden; }
+.hand-rail { display: flex; align-items: flex-end; margin: 0 auto; }
+.hand-card { flex-shrink: 0; border-radius: 7px; transition: transform 0.12s ease, box-shadow 0.12s ease; cursor: grab; touch-action: pan-x; }
+.my-hand.dragging .hand-card { transition: none; }
+.hand-card.grabbed { cursor: grabbing; transform: translateY(-26px) scale(1.05) rotate(-2deg); box-shadow: 0 0 0 3px #cdb3e8, 0 18px 32px rgba(0,0,0,0.6); }
+.hand-card.called { box-shadow: 0 0 0 2px #e8c46a, 0 0 16px rgba(232,196,106,0.55); }
+.hand-card.pg-anchor { position: relative; box-shadow: 0 0 0 2px #e8c46a, 0 0 14px rgba(232,196,106,0.5); cursor: not-allowed; }
+.hand-card.pg-anchor::after {
+  content: '🔒'; position: absolute; top: -8px; right: -6px; z-index: 3;
+  width: 20px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; background: #e8c46a; border: 2px solid #150e26; box-shadow: 0 2px 6px rgba(0,0,0,0.55);
+}
+.hand-tools { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 6px 4px; }
+.ht-hint { font-size: 0.74rem; color: #6b568f; font-style: italic; }
 .hand-card .hc { width: 96px; height: 148px; }
 .hand-card.playable { cursor: pointer; box-shadow: 0 0 0 2px rgba(124,92,196,0.7); }
 .hand-card.playable:hover { transform: translateY(-16px); box-shadow: 0 0 0 2px #7c5cc4, 0 12px 24px rgba(0,0,0,0.5); }
@@ -1017,6 +1481,13 @@ onUnmounted(() => {
 @keyframes cardDeal { from { opacity: 0; transform: translate(-24px, -120px) rotate(-14deg) scale(0.72); } to { opacity: 1; transform: none; } }
 @keyframes miniDeal { from { opacity: 0; transform: scale(0.35); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .my-hand.dealing .hand-card, .hidden-hand.dealing .mini-card { animation: none !important; } }
+
+/* ramassage des cartes avant une redonne */
+.my-hand.collecting .hand-card { animation: cardCollect 0.5s cubic-bezier(0.5,0,0.75,0) forwards; animation-delay: calc(var(--di, 0) * 28ms); }
+.hidden-hand.collecting .mini-card { animation: miniCollect 0.4s cubic-bezier(0.5,0,0.75,0) forwards; animation-delay: calc(var(--di, 0) * 22ms); }
+@keyframes cardCollect { to { opacity: 0; transform: translate(-10px, -170px) rotate(10deg) scale(0.65); } }
+@keyframes miniCollect { to { opacity: 0; transform: scale(0.3); } }
+@media (prefers-reduced-motion: reduce) { .my-hand.collecting .hand-card, .hidden-hand.collecting .mini-card { animation: none !important; } }
 
 /* journal */
 .log-panel { background: #120b21; border-top: 1px solid rgba(196,160,80,0.12); height: 92px; flex-shrink: 0; overflow: hidden; }
@@ -1043,6 +1514,13 @@ onUnmounted(() => {
 .recap-table .pos { color: #7dd6a0; } .recap-table .neg { color: #ff8a8a; }
 .recap-table .recap-delta td { font-weight: 900; color: #e8c46a; border-top: 1px solid rgba(196,160,80,0.3); border-bottom: none; font-size: 1rem; }
 .recap-table .recap-delta td:first-child { color: #e8c46a; }
+.recap-pg { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.recap-pg-row { display: flex; flex-direction: column; gap: 5px; padding: 8px 12px; border-radius: 8px; background: #150e26; border: 1px solid rgba(232,196,106,0.25); }
+.rpg-name { font-size: 0.85rem; font-weight: 700; color: #e8c46a; }
+.rpg-name .muted { color: #7a63a3; font-weight: 400; }
+.rpg-cards { display: flex; flex-wrap: wrap; gap: 3px; }
+.rpg-card { width: 30px; aspect-ratio: 92 / 142; height: auto; }
+
 .recap-players { display: flex; flex-direction: column; gap: 5px; margin-bottom: 18px; }
 .rp-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: #150e26; }
 .rp-row.taker { border: 1px solid rgba(232,196,106,0.4); }
@@ -1074,7 +1552,17 @@ onUnmounted(() => {
   .seat-nom { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .trick-zone { top: max(110px, 30%); bottom: 8%; width: min(92%, 320px); }
   .tc { width: 62px; height: 96px; }
-  .chien-card { width: 44px; height: 68px; }
+  .chien-zone { padding: 10px 14px; gap: 5px; }
+  .chien-tag { font-size: 0.68rem; letter-spacing: 1.4px; }
+  .chien-sub { font-size: 0.7rem; }
+  .chien-cards { gap: 4px; }
+  .chien-card { width: 48px; height: 74px; }
+  .called-zone { left: 4px; bottom: 4px; padding: 4px 7px 4px 4px; gap: 5px; border-radius: 10px; }
+  .cz-card { width: 38px; height: 59px; }
+  .cz-tag { font-size: 0.58rem; letter-spacing: 1px; }
+  .cz-sub { font-size: 0.62rem; max-width: 66px; }
+  .turn-beacon { padding: 7px 16px; gap: 6px; }
+  .ht-hint { display: none; }
   .hand-card .hc { width: 66px; height: 102px; }
   .ltv-cross .tc { height: clamp(48px, calc((100cqh - 150px) / 3), 116px); }
 }
